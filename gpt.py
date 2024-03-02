@@ -13,8 +13,9 @@ device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 print(f'DEVICE: {device}')
 eval_iters = 200
 n_embd = 384
-n_head = 6
-n_layer = 6
+n_head = 4
+assert n_embd % n_head == 0
+n_layer = 2
 dropout = 0.2
 # ------------
 
@@ -219,7 +220,6 @@ print('training...')
 
 
 for iter in range(max_iters):
-
     # every once in a while evaluate the loss on train and val sets
     if iter % eval_interval == 0 or iter == max_iters - 1 or iter==0:
         losses = estimate_loss()

@@ -3,16 +3,19 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # hyperparameters
+print('------------')
 batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-max_iters = 5000
-eval_interval = 500
+max_iters = 1000
+eval_interval = 50
 learning_rate = 3e-4
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+print(f'DEVICE: {device}')
 eval_iters = 200
 n_embd = 384
-n_head = 6
-n_layer = 6
+n_head = 4
+assert n_embd % n_head == 0
+n_layer = 2
 dropout = 0.2
 # ------------
 
@@ -33,9 +36,11 @@ decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integ
 
 # Train and test splits
 data = torch.tensor(encode(text), dtype=torch.long)
-n = int(0.9*len(data)) # first 90% will be train, rest val
+split_num = 0.9
+n = int(split_num*len(data)) # first 90% will be train, rest val
 train_data = data[:n]
 val_data = data[n:]
+print(f'DATA SPLIT: {split_num}')
 
 # data loading
 def get_batch(split):
@@ -61,14 +66,38 @@ def estimate_loss():
     model.train()
     return out
 
+class CustomLinear(nn.Linear):
+    def __init__(self, in_features, out_features, bias=True, epsilon=1e-5):
+        super(CustomLinear, self).__init__(in_features, out_features, bias)
+        self.epsilon = epsilon
+        # Initialize weights and biases here if you want to use custom initialization
+        self.reset_parameters()  # You can override this method instead if you prefer
+
+    def reset_parameters(self):
+        super().reset_parameters()  # Call default initialization
+        self.apply_custom_weight_modifications()
+
+    def apply_custom_weight_modifications(self):
+        with torch.no_grad():
+            gamma = torch.abs(self.weight).mean()
+            normalized_weights = self.weight / (gamma) #+ self.epsilon)
+            clipped_weights = torch.clamp(torch.round(normalized_weights), -1, 1)
+            self.weight.copy_(clipped_weights)
+
+# Function to print the weights of all linear layers
+def print_linear_layer_weights(model):
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear) or isinstance(module, CustomLinear):  # Check for both in case you are using the custom class
+            print(f"Weights of '{name}':\n{module.weight.data}")
+
 class Head(nn.Module):
     """ one head of self-attention """
 
     def __init__(self, head_size):
         super().__init__()
-        self.key = nn.Linear(n_embd, head_size, bias=False)
-        self.query = nn.Linear(n_embd, head_size, bias=False)
-        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.key = CustomLinear(n_embd, head_size, bias=False)
+        self.query = CustomLinear(n_embd, head_size, bias=False)
+        self.value = CustomLinear(n_embd, head_size, bias=False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
 
         self.dropout = nn.Dropout(dropout)
@@ -95,7 +124,7 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.proj = nn.Linear(head_size * num_heads, n_embd)
+        self.proj = CustomLinear(head_size * num_heads, n_embd)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -109,9 +138,9 @@ class FeedFoward(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_embd, 4 * n_embd),
+            CustomLinear(n_embd, 4 * n_embd),
             nn.ReLU(),
-            nn.Linear(4 * n_embd, n_embd),
+            CustomLinear(4 * n_embd, n_embd),
             nn.Dropout(dropout),
         )
 
@@ -135,7 +164,7 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-class GPTLanguageModel(nn.Module):
+class BitLM(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -144,7 +173,7 @@ class GPTLanguageModel(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
-        self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.lm_head = CustomLinear(n_embd, vocab_size)
 
         # better init, not covered in the original GPT video, but important, will cover in followup video
         self.apply(self._init_weights)
@@ -195,26 +224,36 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
 
-model = GPTLanguageModel()
-m = model.to(device)
+
+
+# ------------
+
+bitty = BitLM()
+m = bitty.to(device)
+print(f'MODEL: {bitty.__class__.__name__}')
+
 # print the number of parameters in the model
-print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+print(f'MODEL PARAMS: {sum(p.numel() for p in m.parameters())/1e6} M')
 
 # create a PyTorch optimizer
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(bitty.parameters(), lr=learning_rate)
+print(f'OPTIMIZER: {optimizer.__class__.__name__}')
+
+print('------------')
+print('training...')
+
 
 for iter in range(max_iters):
-
     # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0 or iter == max_iters - 1:
+    if iter % eval_interval == 0 or iter == max_iters - 1 or iter==0:
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(f"step {iter} | train loss {losses['train']:.4f} | val loss {losses['val']:.4f}")
 
     # sample a batch of data
     xb, yb = get_batch('train')
 
     # evaluate the loss
-    logits, loss = model(xb, yb)
+    logits, loss = bitty(xb, yb)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
@@ -223,3 +262,6 @@ for iter in range(max_iters):
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
 print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
 #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
+
+# Call the function
+print_linear_layer_weights(bitty)
