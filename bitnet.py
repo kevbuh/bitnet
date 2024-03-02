@@ -6,8 +6,8 @@ from torch.nn import functional as F
 print('------------')
 batch_size = 32 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-max_iters = 2000
-eval_interval = 100
+max_iters = 10000
+eval_interval = 500
 learning_rate = 3e-4
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 print(f'DEVICE: {device}')
@@ -25,6 +25,7 @@ torch.manual_seed(1337)
 with open('input.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
+# TODO: make BPE tokenizer
 # here are all the unique characters that occur in this text
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
@@ -94,12 +95,24 @@ class CustomLinear(nn.Linear):
         normalized_weights = weights / (gamma + self.epsilon)
         clipped_weights = torch.clamp(torch.round(normalized_weights), -1, 1)
         return clipped_weights
+    
+    def verify_clamping(self):
+        # Check if any weights are outside the bounds [-1, 1]
+        if not torch.all(torch.ge(self.weight, -1)) or not torch.all(torch.le(self.weight, 1)):
+            # print("Warning: Weights are not correctly clamped.")
+            pass
+            return False
+        else:
+            print("All weights are correctly clamped between [-1, 1].")
+            return True
+
 
 # Function to print the weights of all linear layers
 def print_linear_layer_weights(model):
     for name, module in model.named_modules():
         if isinstance(module, nn.Linear) or isinstance(module, CustomLinear):  # Check for both in case you are using the custom class
             print(f"Weights of '{name}':\n{module.weight.data}")
+            
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -234,8 +247,13 @@ class BitLM(nn.Module):
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
-
-
+    
+    def verify_all_clamping(self):
+        for module in self.modules():
+            if isinstance(module, CustomLinear):
+                if not module.verify_clamping():
+                    return False
+        return True
 
 # ------------
 
@@ -257,13 +275,12 @@ load_train = True
 if load_train:
     # load checkpoint weights
     print("loading checkpoint weights")
-    checkpoint_path = 'checkpoints/checkpoint_iter_301.pth'  # Replace with the path to your checkpoint
+    checkpoint_path = 'checkpoints/checkpoint_iter_10501.pth'  # Replace with the path to your checkpoint
     checkpoint = torch.load(checkpoint_path)
     patrick.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     start_iter = checkpoint['iter']
 print('training...')
-
 
 
 for iter in range(max_iters):
@@ -297,13 +314,12 @@ for iter in range(max_iters):
 # print("------WEIGHTS")
 
 # generate from the model
-print('generating text...')
+print("WEIGHT VERIFICATION:", patrick.verify_all_clamping())
+print('GENERATING TEXT...')
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print("CONTEXT: ", context)
 print("GENERATION: ", patrick.generate(context, max_new_tokens=100)[0].tolist())
 print("DECODE: ", decode(patrick.generate(context, max_new_tokens=100)[0].tolist()))
 
 
 #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
-
 # Call the function
