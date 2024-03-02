@@ -4,17 +4,17 @@ from torch.nn import functional as F
 
 # hyperparameters
 print('------------')
-batch_size = 64 # how many independent sequences will we process in parallel?
+batch_size = 32 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
-max_iters = 1000
-eval_interval = 50
+max_iters = 2000
+eval_interval = 100
 learning_rate = 3e-4
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 print(f'DEVICE: {device}')
-eval_iters = 200
+eval_iters = 50
 n_embd = 384
 n_head = 4
-assert n_embd % n_head == 0
+assert n_embd % n_head == 0, "n_embd must be divisible by n_head"
 n_layer = 2
 dropout = 0.2
 # ------------
@@ -55,15 +55,15 @@ def get_batch(split):
 @torch.no_grad()
 def estimate_loss():
     out = {}
-    model.eval()
+    patrick.eval()
     for split in ['train', 'val']:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
             X, Y = get_batch(split)
-            logits, loss = model(X, Y)
+            logits, loss = patrick(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
-    model.train()
+    patrick.train()
     return out
 
 class CustomLinear(nn.Linear):
@@ -80,9 +80,20 @@ class CustomLinear(nn.Linear):
     def apply_custom_weight_modifications(self):
         with torch.no_grad():
             gamma = torch.abs(self.weight).mean()
-            normalized_weights = self.weight / (gamma) #+ self.epsilon)
+            normalized_weights = self.weight / (gamma) #+ self.epsilon) # TODO: fix epsilon
             clipped_weights = torch.clamp(torch.round(normalized_weights), -1, 1)
             self.weight.copy_(clipped_weights)
+
+    def forward(self, input):
+        # Hook to clamp the weights before each forward pass
+        self.weight.data = self.clamp_weights(self.weight.data)
+        return super(CustomLinear, self).forward(input)
+
+    def clamp_weights(self, weights):
+        gamma = torch.abs(weights).mean()
+        normalized_weights = weights / (gamma + self.epsilon)
+        clipped_weights = torch.clamp(torch.round(normalized_weights), -1, 1)
+        return clipped_weights
 
 # Function to print the weights of all linear layers
 def print_linear_layer_weights(model):
@@ -228,40 +239,71 @@ class BitLM(nn.Module):
 
 # ------------
 
-bitty = BitLM()
-m = bitty.to(device)
-print(f'MODEL: {bitty.__class__.__name__}')
+
+patrick = BitLM()
+m = patrick.to(device)
+print(f'MODEL: {patrick.__class__.__name__}')
 
 # print the number of parameters in the model
 print(f'MODEL PARAMS: {sum(p.numel() for p in m.parameters())/1e6} M')
 
 # create a PyTorch optimizer
-optimizer = torch.optim.AdamW(bitty.parameters(), lr=learning_rate)
+optimizer = torch.optim.AdamW(patrick.parameters(), lr=learning_rate)
 print(f'OPTIMIZER: {optimizer.__class__.__name__}')
-
 print('------------')
+
+start_iter = 0
+load_train = True
+if load_train:
+    # load checkpoint weights
+    print("loading checkpoint weights")
+    checkpoint_path = 'checkpoints/checkpoint_iter_301.pth'  # Replace with the path to your checkpoint
+    checkpoint = torch.load(checkpoint_path)
+    patrick.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    start_iter = checkpoint['iter']
 print('training...')
 
 
+
 for iter in range(max_iters):
+    if start_iter:
+        iter += start_iter
+    else:
+        iter = iter
     # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0 or iter == max_iters - 1 or iter==0:
+    if iter % eval_interval == 0 or iter == max_iters - 1:
         losses = estimate_loss()
         print(f"step {iter} | train loss {losses['train']:.4f} | val loss {losses['val']:.4f}")
+
+        checkpoint = {
+        'iter': iter + 1,
+        'state_dict': patrick.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        }
+        torch.save(checkpoint, f'checkpoints/checkpoint_iter_{iter+1}.pth')
 
     # sample a batch of data
     xb, yb = get_batch('train')
 
     # evaluate the loss
-    logits, loss = bitty(xb, yb)
+    logits, loss = patrick(xb, yb)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
 
+# print("WEIGHTS------")
+# print_linear_layer_weights(patrick)
+# print("------WEIGHTS")
+
 # generate from the model
+print('generating text...')
 context = torch.zeros((1, 1), dtype=torch.long, device=device)
-print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+print("CONTEXT: ", context)
+print("GENERATION: ", patrick.generate(context, max_new_tokens=100)[0].tolist())
+print("DECODE: ", decode(patrick.generate(context, max_new_tokens=100)[0].tolist()))
+
+
 #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
 
 # Call the function
-print_linear_layer_weights(bitty)
