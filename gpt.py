@@ -3,12 +3,14 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # hyperparameters
+print('------------')
 batch_size = 64 # how many independent sequences will we process in parallel?
 block_size = 256 # what is the maximum context length for predictions?
 max_iters = 5000
-eval_interval = 500
+eval_interval = 200
 learning_rate = 3e-4
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+print(f'DEVICE: {device}')
 eval_iters = 200
 n_embd = 384
 n_head = 6
@@ -33,9 +35,11 @@ decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integ
 
 # Train and test splits
 data = torch.tensor(encode(text), dtype=torch.long)
-n = int(0.9*len(data)) # first 90% will be train, rest val
+split_num = 0.9
+n = int(split_num*len(data)) # first 90% will be train, rest val
 train_data = data[:n]
 val_data = data[n:]
+print(f'DATA SPLIT: {split_num}')
 
 # data loading
 def get_batch(split):
@@ -195,20 +199,31 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
 
+
+
+# ------------
+
 model = GPTLanguageModel()
 m = model.to(device)
+print(f'MODEL: {model.__class__.__name__}')
+
 # print the number of parameters in the model
-print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+print(f'MODEL PARAMS: {sum(p.numel() for p in m.parameters())/1e6} M')
 
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+print(f'OPTIMIZER: {optimizer.__class__.__name__}')
+
+print('------------')
+print('training...')
+
 
 for iter in range(max_iters):
 
     # every once in a while evaluate the loss on train and val sets
-    if iter % eval_interval == 0 or iter == max_iters - 1:
+    if iter % eval_interval == 0 or iter == max_iters - 1 or iter==0:
         losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+        print(f"step {iter} | train loss {losses['train']:.4f} | val loss {losses['val']:.4f}")
 
     # sample a batch of data
     xb, yb = get_batch('train')
