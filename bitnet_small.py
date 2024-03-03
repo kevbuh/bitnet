@@ -4,19 +4,18 @@ from torch.nn import functional as F
 
 # hyperparameters
 print('------------')
-batch_size = 32 # how many independent sequences will we process in parallel?
-block_size = 256 # what is the maximum context length for predictions?
+batch_size = 16 # how many independent sequences will we process in parallel?
+block_size = 8 # what is the maximum context length for predictions?
 max_iters = 10000
 eval_interval = 500
-learning_rate = 0.0008
-print(f'LEARNING RATE: {learning_rate}')
+learning_rate = 0.001
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
 print(f'DEVICE: {device}')
 eval_iters = 50
-n_embd = 384
+n_embd = 8
 n_head = 4
 assert n_embd % n_head == 0, "n_embd must be divisible by n_head"
-n_layer = 2
+n_layer = 1
 dropout = 0.2
 # ------------
 
@@ -264,7 +263,7 @@ m = patrick.to(device)
 print(f'MODEL: {patrick.__class__.__name__}')
 
 # print the number of parameters in the model
-print(f'MODEL PARAMS: {sum(p.numel() for p in m.parameters())/1e6} M')
+print(f'MODEL PARAMS: {sum(p.numel() for p in m.parameters())}')
 
 # create a PyTorch optimizer
 optimizer = torch.optim.AdamW(patrick.parameters(), lr=learning_rate)
@@ -272,11 +271,11 @@ print(f'OPTIMIZER: {optimizer.__class__.__name__}')
 print('------------')
 
 start_iter = 0
-load_train = True
+load_train = False
 if load_train:
     # load checkpoint weights
     print("loading checkpoint weights")
-    checkpoint_path = 'checkpoints/checkpoint_iter_43501.pth'  # Replace with the path to your checkpoint
+    checkpoint_path = 'checkpoints/checkpoint_iter_10501.pth'  # Replace with the path to your checkpoint
     checkpoint = torch.load(checkpoint_path)
     patrick.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
