@@ -1,4 +1,4 @@
-# bitnet
+# bitnet - WIP!
 
 ![Paper diagram](https://github.com/kevbuh/bitnet/blob/main/bitimg.png)
 
