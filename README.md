@@ -63,9 +63,18 @@ Fowuvee d awla, t hay d
 ITa beay, poumerem e lder sit owayoud tho
 ```
 
+# Setup
 
-Vanilla GPT implementation is from [Andrej Karpathy](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py)
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+# Vanilla GPT + Modified nn.Linear
+
+Vanilla GPT with modified nn.Linear layer. Vanilla implementation is from [Andrej Karpathy](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py)
 
 <img src="https://i.kym-cdn.com/entries/icons/facebook/000/035/960/Screen_Shot_2020-12-02_at_3.12.45_PM.jpg" width="400">
 
-This image represents the network well lol
+baby patrick
