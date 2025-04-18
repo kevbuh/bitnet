@@ -1,8 +1,8 @@
 # bitnet
 
-Based on Microsoft's [*The Era of 1-bit LLMs*](https://arxiv.org/abs/2402.17764).
+```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), an open-source 1-bit large language model (LLM) with two billion parameters trained on four trillion tokens. 
 
-```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), an open-source 1-bit large language model (LLM) with two billion parameters trained on four trillion tokens. This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough to work efficiently on a CPU.
+This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough to work efficiently on a CPU.
 
 ## Features
 
@@ -11,9 +11,17 @@ Based on Microsoft's [*The Era of 1-bit LLMs*](https://arxiv.org/abs/2402.17764)
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
----
 
-**No more floats.** Just weights in **[1, 0, -1]**.
+tldr; **No more floats.** Just weights in **[1, 0, -1]**.
+
+# Papers
+
+[BitNet: Scaling 1-bit Transformers for Large Language Models](https://arxiv.org/abs/2310.11453)
+
+[The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits](https://arxiv.org/abs/2402.17764)
+
+[BitNet b1.58 2B4T Technical Report](https://arxiv.org/abs/2504.12285)
+
 
 # Example
 
