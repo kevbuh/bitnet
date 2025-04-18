@@ -2,7 +2,7 @@
 
 Based on Microsoft's [*The Era of 1-bit LLMs*](https://arxiv.org/abs/2402.17764).
 
-This is a toy (work-in-progress) implementation of **BitNet** — a simple 1-bit Transformer for large language models.
+```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), an open-source 1-bit large language model (LLM) with two billion parameters trained on four trillion tokens. This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough to work efficiently on a CPU.
 
 ## Features
 
