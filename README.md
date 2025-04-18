@@ -20,11 +20,6 @@ This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough
 
 # Setup
 
-<!-- ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-``` -->
 First, install tinygrad:
 
 ```bash
@@ -33,6 +28,13 @@ cd tinygrad
 python3 -m pip install -e .
 cd ..
 ```
+
+<!-- ```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+``` -->
+
 <!-- # Example
 
 Turns out I really need a GPU to train cuz it takes too long
