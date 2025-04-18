@@ -1,18 +1,14 @@
 # bitnet
 
 ```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), an open-source 1-bit large language model (LLM) with two billion parameters trained on four trillion tokens. 
-
-This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough to work efficiently on a CPU.
-
-## Features
-
 - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
 - **Competitive**: Performs close to 8-bit and FP16 baselines on language tasks.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
+This repo uses [tinygrad](https://docs.tinygrad.org/), and is lightweight enough to work efficiently on a CPU.
 
-tldr; **No more floats.** Just weights in **[1, 0, -1]**.
+<!-- tldr; **No more floats.** Just weights in **[1, 0, -1]**. -->
 
 # Papers
 
@@ -22,8 +18,22 @@ tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
 [BitNet b1.58 2B4T Technical Report](https://arxiv.org/abs/2504.12285)
 
+# Setup
 
-# Example
+<!-- ```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+``` -->
+First, install tinygrad:
+
+```bash
+git clone https://github.com/tinygrad/tinygrad.git
+cd tinygrad
+python3 -m pip install -e .
+cd ..
+```
+<!-- # Example
 
 Turns out I really need a GPU to train cuz it takes too long
 ```bash
@@ -65,12 +75,4 @@ DECODE:
 tut caetsed lyRAicrst're f, t, mas
 Fowuvee d awla, t hay d
 ITa beay, poumerem e lder sit owayoud tho
-```
-
-# Setup
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+``` -->
