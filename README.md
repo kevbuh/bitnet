@@ -1,23 +1,19 @@
-# bitnet - WIP!
+# bitnet
 
-![Paper diagram](https://github.com/kevbuh/bitnet/blob/main/bitimg.png)
+Based on Microsoft's [*The Era of 1-bit LLMs*](https://arxiv.org/abs/2402.17764).
 
-Based on Microsoft's ['The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits'](https://arxiv.org/abs/2402.17764) paper.
+This is a toy (work-in-progress) implementation of **BitNet** — a simple 1-bit Transformer for large language models.
 
-This repository introduces a toy work-in-progress implementation of BitNet - a scalable and stable 1-bit Transformer architecture designed specifically for large language models.
+## Features
 
-# Key Features
-BitLinear: BitNet introduces BitLinear, a drop-in replacement for the nn.Linear layer in PyTorch. BitLinear allows training of 1-bit weights from scratch, enabling efficient and accurate models.
+- **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
+- **Competitive**: Performs close to 8-bit and FP16 baselines on language tasks.
+- **Efficient**: 1-bit weights + activations = low memory + energy use.
+- **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
-Competitive Performance: Experimental results on language modeling tasks demonstrate that BitNet achieves competitive performance compared to state-of-the-art 8-bit quantization methods and FP16 Transformer baselines.
+---
 
-Memory and Energy Efficiency: By utilizing 1-bit weights and activations, BitNet substantially reduces memory footprint and energy consumption, making it an attractive solution for deploying large language models.
-
-Scaling Capabilities: BitNet exhibits a scaling law akin to full-precision Transformers, suggesting its potential for effective scaling to even larger language models while maintaining efficiency and performance benefits.
-
-
-NO MORE FLOATS!!! A very simple transformer whose weights are just [1,0,-1]
-
+**No more floats.** Just weights in **[1, 0, -1]**.
 
 # Example
 
