@@ -26,6 +26,21 @@ setup.sh
 source venv/bin/activate
 ```
 
+# Model Architecture
+
+Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
+
+- Parameters: ~2 Billion
+- Training Tokens: 4 Trillion
+- Context Length: Maximum sequence length of 4096 tokens.
+- Transformer-based:
+    - modified with BitLinear layers
+    - Uses Rotary Position Embeddings (RoPE).
+    - Uses squared ReLU (ReLU²) activation in FFN layers.
+    - Employs subln normalization.
+    - No bias terms in linear or normalization layers.
+
+
 <!-- # Example
 
 Turns out I really need a GPU to train cuz it takes too long
