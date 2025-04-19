@@ -1,2 +1,5 @@
 .DS_Store
 tinygrad
+venv
+__pycache__
+model.safetensors
