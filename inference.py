@@ -72,7 +72,6 @@ def build_flax_params(groups: dict) -> dict:
 
         # Feed-forward block maps
         mlp_block = blocks.get('mlp', {})
-        # gate_proj -> wi, up_proj -> wo
         if 'gate_proj' in mlp_block and 'up_proj' in mlp_block:
             for alias, key in (('wi', 'gate_proj'), ('wo', 'up_proj')):
                 bucket = mlp_block[key]
@@ -104,41 +103,33 @@ class BitLinear(nn.Module):
 
 class BitSelfAttention(nn.Module):
     cfg: dict
-    weights: dict  # q_proj, k_proj, v_proj, o_proj
+    weights: dict
 
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         b, t, _ = x.shape
-        # Project inputs
-        q_out = x @ self.weights['q_proj'].T  # [b, t, out_q]
-        k_out = x @ self.weights['k_proj'].T  # [b, t, out_k]
-        v_out = x @ self.weights['v_proj'].T  # [b, t, out_v]
-        # Head configurations
+        q_out = x @ self.weights['q_proj'].T
+        k_out = x @ self.weights['k_proj'].T
+        v_out = x @ self.weights['v_proj'].T
         h_q = self.cfg['num_attention_heads']
         h_kv = self.cfg['num_key_value_heads']
-        # Compute per-head dimensions
         dh_q = q_out.shape[-1] // h_q
         dh_k = k_out.shape[-1] // h_kv
-        # Reshape and transpose to [b, h, t, d]
         q = q_out.reshape(b, t, h_q, dh_q).transpose(0,2,1,3)
         k = k_out.reshape(b, t, h_kv, dh_k).transpose(0,2,1,3)
         v = v_out.reshape(b, t, h_kv, dh_k).transpose(0,2,1,3)
-        # Broadcast K and V to match attention heads
-        group_size = h_q // h_kv
-        k = jnp.repeat(k, group_size, axis=1)
-        v = jnp.repeat(v, group_size, axis=1)
-        # Attention scores
+        repeat = h_q // h_kv
+        k = jnp.repeat(k, repeat, axis=1)
+        v = jnp.repeat(v, repeat, axis=1)
         attn_logits = (q @ k.transpose(0,1,3,2)) / jnp.sqrt(dh_q)
         mask = jnp.tril(jnp.ones((t, t)))
         attn = nn.softmax(jnp.where(mask, attn_logits, -1e10), axis=-1)
-        # Context
         ctx = (attn @ v).transpose(0,2,1,3).reshape(b, t, self.weights['o_proj'].shape[0])
-        # Output projection
-        out = ctx @ self.weights['o_proj']
-        return out
+        return ctx @ self.weights['o_proj']
+
 
 class BitFFN(nn.Module):
-    weights: dict  # wi, wo
+    weights: dict
 
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
@@ -156,7 +147,6 @@ class BitDecoderLayer(nn.Module):
         x_norm = nn.LayerNorm()(x)
         attn_out = BitSelfAttention(self.cfg, self.params['attn'])(x_norm)
         x = x + attn_out
-
         x_norm = nn.LayerNorm()(x)
         ffn_out = BitFFN(self.params['ffn'])(x_norm)
         return x + ffn_out
@@ -168,27 +158,23 @@ class BitNetModel(nn.Module):
 
     @nn.compact
     def __call__(self, input_ids: jnp.ndarray) -> jnp.ndarray:
-        # Use pre‑loaded embedding matrix
-        embed_tokens = self.params['embed_tokens']  # [vocab, hidden]
+        embed_tokens = self.params['embed_tokens']
         x = jnp.take(embed_tokens, input_ids, axis=0)
-
         pos = self.param('pos_embed', nn.initializers.normal(0.02),
                           (1, self.cfg['max_position_embeddings'], self.cfg['hidden_size']))
         x = x + pos[:, :x.shape[1], :]
-
         for i in range(self.cfg['num_hidden_layers']):
             layer_key = f'layer.{i}'
             x = BitDecoderLayer(self.cfg, self.params[layer_key])(x)
-
         x = nn.LayerNorm()(x)
-        # tied LM head
         logits = x @ embed_tokens.T
         return logits
 
 
 if __name__ == '__main__':
-    cfg = json.load(open('bitnet-b1.58-2B-4T/config.json'))
-    groups = load_weight_groups('bitnet-b1.58-2B-4T/model.safetensors')
+    bitnet_dir = "bitnet-b1.58-2B-4T/"
+    cfg = json.load(open(bitnet_dir+'config.json'))
+    groups = load_weight_groups(bitnet_dir+'model.safetensors')
     print('Top-level keys:', [k for k in groups if not k.startswith('layer.')])
     params = build_flax_params(groups)
 
@@ -200,17 +186,32 @@ if __name__ == '__main__':
     tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
     tokenizer.pad_token = tokenizer.eos_token
 
+    gen_cfg = json.load(open(bitnet_dir+'generation_config.json'))
+
     @jax.jit
     def step(ids):
         return model.apply(vars, ids)
 
     def generate(prompt: str, max_new: int=50) -> str:
         ids = tokenizer(prompt, return_tensors='jax')['input_ids']
+        cur_rng = rng
         for _ in range(max_new):
             print("*")
-            logits = step(ids)
-            nxt = jnp.argmax(logits[0, -1])
-            ids = jnp.concatenate([ids, nxt[None, None]], axis=1)
-        return tokenizer.decode(ids[0])
+            logits = step(ids)[0, -1]
+            if gen_cfg.get('do_sample', False):
+                cur_rng, subkey = jax.random.split(cur_rng)
+                scaled = logits / gen_cfg.get('temperature', 1.0)
+                if gen_cfg.get('top_p', 1.0) < 1.0:
+                    sorted_logits = jnp.sort(scaled)[::-1]
+                    sorted_idx = jnp.argsort(scaled)[::-1]
+                    cum_probs = jnp.cumsum(nn.softmax(sorted_logits))
+                    cutoff = cum_probs > gen_cfg['top_p']
+                    thresh = sorted_logits[jnp.argmax(cutoff)]
+                    scaled = jnp.where(scaled < thresh, -jnp.inf, scaled)
+                next_id = jax.random.categorical(subkey, scaled)
+            else:
+                next_id = jnp.argmax(logits)
+            ids = jnp.concatenate([ids, next_id[None, None]], axis=1)
+        return tokenizer.decode(ids[0], skip_special_tokens=True)
 
     print(generate('Hello, world', max_new=20))
