@@ -172,9 +172,8 @@ class BitNetModel(nn.Module):
 
 
 if __name__ == '__main__':
-    bitnet_dir = "bitnet-b1.58-2B-4T/"
-    cfg = json.load(open(bitnet_dir+'config.json'))
-    groups = load_weight_groups(bitnet_dir+'model.safetensors')
+    cfg = json.load(open('bitnet-b1.58-2B-4T/config.json'))
+    groups = load_weight_groups('bitnet-b1.58-2B-4T/model.safetensors')
     print('Top-level keys:', [k for k in groups if not k.startswith('layer.')])
     params = build_flax_params(groups)
 
@@ -184,9 +183,11 @@ if __name__ == '__main__':
     vars = model.init(rng, dummy)
 
     tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+    special = json.load(open('bitnet-b1.58-2B-4T/special_tokens_map.json'))
+    tokenizer.add_special_tokens({'bos_token': special['bos_token'], 'eos_token': special['eos_token']})
     tokenizer.pad_token = tokenizer.eos_token
 
-    gen_cfg = json.load(open(bitnet_dir+'generation_config.json'))
+    gen_cfg = json.load(open('bitnet-b1.58-2B-4T/generation_config.json'))
 
     @jax.jit
     def step(ids):
@@ -196,14 +197,12 @@ if __name__ == '__main__':
         ids = tokenizer(prompt, return_tensors='jax')['input_ids']
         cur_rng = rng
         for _ in range(max_new):
-            print("*")
             logits = step(ids)[0, -1]
             if gen_cfg.get('do_sample', False):
                 cur_rng, subkey = jax.random.split(cur_rng)
                 scaled = logits / gen_cfg.get('temperature', 1.0)
                 if gen_cfg.get('top_p', 1.0) < 1.0:
                     sorted_logits = jnp.sort(scaled)[::-1]
-                    sorted_idx = jnp.argsort(scaled)[::-1]
                     cum_probs = jnp.cumsum(nn.softmax(sorted_logits))
                     cutoff = cum_probs > gen_cfg['top_p']
                     thresh = sorted_logits[jnp.argmax(cutoff)]
