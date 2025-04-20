@@ -2,5 +2,5 @@
 tinygrad
 venv
 __pycache__
-weights/model.safetensors
 weights
+bitnet-b1.58-2B-4T
