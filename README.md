@@ -22,11 +22,11 @@ This repo uses [JAX](https://docs.jax.dev/en/latest/quickstart.html) and [Flax](
 
 ```bash
 chmod +x setup.sh
-setup.sh
+./setup.sh
 source venv/bin/activate
 ```
 
-# Model Architecture
+# Notes
 
 Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
 
@@ -40,7 +40,7 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
     - Employs subln normalization.
     - No bias terms in linear or normalization layers.
 
-# Model Config
+# Model Architecture
 
 ```json
 {
