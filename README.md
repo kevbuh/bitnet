@@ -40,6 +40,40 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
     - Employs subln normalization.
     - No bias terms in linear or normalization layers.
 
+# Model Config
+
+```json
+{
+    "architectures": [
+      "BitNetForCausalLM"
+    ],
+    "auto_map": {
+      "AutoConfig": "configuration_bitnet.BitNetConfig",
+      "AutoModelForCausalLM": "modeling_bitnet.BitNetForCausalLM"
+    },
+    "bos_token_id": 128000,
+    "eos_token_id": 128001,
+    "hidden_act": "relu2",
+    "hidden_size": 2560,
+    "initializer_range": 0.02,
+    "intermediate_size": 6912,
+    "max_position_embeddings": 4096,
+    "model_type": "bitnet",
+    "rms_norm_eps": 1e-05,
+    "num_attention_heads": 20,
+    "num_hidden_layers": 30,
+    "num_key_value_heads": 5,
+    "rope_theta": 500000.0,
+    "tie_word_embeddings": true,
+    "torch_dtype": "bfloat16",
+    "use_cache": true,
+    "vocab_size": 128256,
+    "quantization_config": {
+      "quant_method": "bitnet",
+      "offline_quantization": true
+    }
+}
+```
 
 <!-- # Example
 
