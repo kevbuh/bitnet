@@ -6,7 +6,7 @@
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
-This repo uses [JAX](https://docs.jax.dev/en/latest/quickstart.html), and is lightweight enough to work efficiently on a CPU.
+This repo uses [JAX](https://docs.jax.dev/en/latest/quickstart.html) and [Flax](https://flax.readthedocs.io/en/latest/index.html), and is lightweight enough to work efficiently on a CPU.
 
 <!-- tldr; **No more floats.** Just weights in **[1, 0, -1]**. -->
 
