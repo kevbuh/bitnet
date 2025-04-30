@@ -94,3 +94,10 @@ generation_config.json
   "transformers_version": "4.40.0.dev0"
 }
 ```
+
+# Todo
+- Test performance against hugging face and Microsoft bitnet.cpp
+- Make new hardware for it (fpga)
+  - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
+- Make a novel 1-bit Mixture-of-Experts (MoE)
+- Set up custom installation script thats nice and says jax or torch and which models to run 
