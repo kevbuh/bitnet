@@ -99,3 +99,4 @@ generation_config.json
   - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
 - Make a novel 1-bit Mixture-of-Experts (MoE)
 - Set up custom installation script thats nice and says jax or torch and which models to run 
+- make {0,1} model work
