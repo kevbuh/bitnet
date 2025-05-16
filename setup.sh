@@ -5,7 +5,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 
-pip install torch
+pip install torch tqdm
 
 # weights: https://huggingface.co/microsoft/bitnet-b1.58-2B-4T/blob/main/model.safetensors
 if [ -d "bitnet-b1.58-2B-4T" ]; then

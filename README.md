@@ -2,9 +2,10 @@
 
 ```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), an open-source 1-bit large language model (LLM) with two billion parameters trained on four trillion tokens. 
 - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
-- **Competitive**: Performs close to 8-bit and FP16 baselines on language tasks.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
+
+This repo uses [karpathy's GPT](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py) with the modified nn.Linear layer.
 
 tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
