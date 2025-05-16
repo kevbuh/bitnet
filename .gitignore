@@ -1,1 +1,6 @@
 .DS_Store
+tinygrad
+venv
+__pycache__
+weights
+bitnet-b1.58-2B-4T
