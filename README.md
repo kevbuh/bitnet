@@ -6,9 +6,7 @@
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
-This repo uses [tinygrad](https://github.com/tinygrad/tinygrad), and is efficient enough to run the full model on a CPU.
-
-<!-- tldr; **No more floats.** Just weights in **[1, 0, -1]**. -->
+tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
 # Papers
 
