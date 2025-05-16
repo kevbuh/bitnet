@@ -6,7 +6,7 @@
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
-This repo uses [JAX](https://docs.jax.dev/en/latest/quickstart.html) and [Flax](https://flax.readthedocs.io/en/latest/index.html), and is lightweight enough to work efficiently on a CPU.
+This repo uses [tinygrad](https://github.com/tinygrad/tinygrad), and is efficient enough to run the full model on a CPU.
 
 <!-- tldr; **No more floats.** Just weights in **[1, 0, -1]**. -->
 
@@ -96,7 +96,7 @@ generation_config.json
 ```
 
 # Todo
-- Test performance against hugging face and Microsoft bitnet.cpp
+- Test performance against huggingface and Microsoft bitnet.cpp
 - Make new hardware for it (fpga)
   - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
 - Make a novel 1-bit Mixture-of-Experts (MoE)
