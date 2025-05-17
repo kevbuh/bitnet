@@ -66,13 +66,13 @@ class BitLinear(nn.Module):
         Returns:
         y: an output tensor with shape [n, d]
         """
-        w = self.weight # a weight tensor with shape [d, k]
         x_norm = self.norm(x)
+        w = self.weight # a weight tensor with shape [d, k]
+        if not self.training: return F.linear(x_norm, w, self.bias) 
         # A trick for implementing Straight−Through−Estimator (STE) using detach()
         x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
         if self.quant_type == 'b1.58':
             w_quant = w + (weight_quant(w) - w).detach()
         elif self.quant_type == 'b1':
             w_quant = w + (weight_quant_b1(w) - w).detach()
-        y = F.linear(x_quant, w_quant, self.bias)
-        return y
+        return F.linear(x_quant, w_quant, self.bias)

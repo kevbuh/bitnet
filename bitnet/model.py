@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from tqdm import tqdm
-from utils import print_model_params, training_step, evaluate_and_print_loss, print_weights
+from utils import print_model_params, training_step, print_weights, timeit
 from BitLinear import BitLinear
 
 # torch.manual_seed(1337)
@@ -191,7 +191,7 @@ class GPTLanguageModel(nn.Module):
     
 def generate_output(m):
     print("decoding...")
-    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    context = torch.zeros((1, 1), device=device)
     chars = sorted(list(set(text)))
     itos = { i:ch for i,ch in enumerate(chars) }
     decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
@@ -231,4 +231,4 @@ if __name__ == "__main__":
         xb, yb = get_batch('train')
         loss = training_step(model, xb, yb, optimizer)
     print_weights(m)
-    generate_output(m)
+    timeit(generate_output(m))

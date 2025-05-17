@@ -52,8 +52,6 @@ def training_step(model, xb, yb, optimizer):
 def print_weights(model, layer_name=None):
   print("\nModel Weights:")
   for name, param in model.named_parameters():
-    if layer_name is None or layer_name in name:
-      print(f"Layer: {name}, Shape: {param.shape}")
-      print(f"Sample weights: {param.data.flatten()[:5]}...")
-      print(f"Stats: min={param.data.min().item():.4f}, max={param.data.max().item():.4f}, mean={param.data.mean().item():.4f}")
-      print("-" * 50)
+    # if layer_name is None or layer_name in name:
+    print(f"Layer: {name}, Shape: {param.shape} Stats: min={param.data.min().item():.4f}, max={param.data.max().item():.4f}, mean={param.data.mean().item():.4f} Weights: {param.data.flatten()[:5]}...")
+    # print("-" * 50)
