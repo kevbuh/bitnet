@@ -6,7 +6,7 @@ from torch.nn import functional as F
 from tqdm import tqdm
 import time
 
-from bitlinear import BitLinear
+from BitLinear import BitLinear
 
 # hyperparameters
 batch_size = 32 # how many independent sequences will we process in parallel?

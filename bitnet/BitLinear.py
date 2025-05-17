@@ -1,6 +1,8 @@
 from torch import nn
 from torch.nn import RMSNorm
 import torch.nn.functional as F
+import torch
+import math
 
 def activation_quant(x):
     """ Per-token quantization to 8 bits. No grouping is needed for quantization.
@@ -35,15 +37,27 @@ def weight_quant_b1(w):
     e = w.mean()
     u = (w - e).sign() * scale
     return u
-
-class BitLinear(nn.Linear):
+    
+class BitLinear(nn.Module):
     """
     This is only for training, and kernel optimization is needed for efficiency.
     """
     def __init__(self, in_features, out_features, bias=True, quant_type='b1.58'):
-        super().__init__(in_features, out_features, bias)
+        super().__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = nn.Parameter(torch.empty((out_features, in_features)))
+        self.bias = nn.Parameter(torch.empty(out_features)) if bias else None
         self.norm = RMSNorm(in_features)
         self.quant_type = quant_type
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            nn.init.uniform_(self.bias, -bound, bound)
         
     def forward(self, x):
         """
@@ -60,5 +74,5 @@ class BitLinear(nn.Linear):
             w_quant = w + (weight_quant(w) - w).detach()
         elif self.quant_type == 'b1':
             w_quant = w + (weight_quant_b1(w) - w).detach()
-        y = F.linear(x_quant, w_quant)
+        y = F.linear(x_quant, w_quant, self.bias)
         return y
