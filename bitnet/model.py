@@ -8,22 +8,6 @@ import time
 
 from BitLinear import BitLinear
 
-# hyperparameters
-batch_size = 32 # how many independent sequences will we process in parallel?
-block_size = 256 # what is the maximum context length for predictions?
-max_iters = 5000
-eval_interval = 500
-learning_rate = 3e-4
-device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
-# device = 'cpu'
-print(f"Using device: {device}")
-eval_iters = 200
-n_embd = 384
-n_head = 6
-n_layer = 6
-dropout = 0.2
-# ------------
-
 torch.manual_seed(1337)
 
 # wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
@@ -202,8 +186,25 @@ class GPTLanguageModel(nn.Module):
         return idx
 
 if __name__ == "__main__":
+    # hyperparameters
+    batch_size = 32 # how many independent sequences will we process in parallel?
+    block_size = 256 # what is the maximum context length for predictions?
+    max_iters = 500
+    eval_interval = 500
+    learning_rate = 3e-4
+    device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
+    print(f"Using device: {device}")
+    eval_iters = 200
+    n_embd = 384
+    n_head = 6
+    n_layer = 6
+    dropout = 0.2
+    # ------------
+
     model = GPTLanguageModel()
     m = model.to(device)
+    # m = torch.compile(m)
     # print the number of parameters in the model
     print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
     # create a PyTorch optimizer
@@ -227,6 +228,19 @@ if __name__ == "__main__":
         step_time = end_time - start_time  # Calculate duration
         print(f"Time taken for step {iter}: {step_time:.4f} seconds")
     # generate from the model
+    
+    # Print model weights
+    def print_weights(model, layer_name=None):
+        for name, param in model.named_parameters():
+            if layer_name is None or layer_name in name:
+                print(f"Layer: {name}, Shape: {param.shape}")
+                print(f"Sample weights: {param.data.flatten()[:5]}...")
+                print(f"Stats: min={param.data.min().item():.4f}, max={param.data.max().item():.4f}, mean={param.data.mean().item():.4f}")
+                print("-" * 50)
+    
+    print("\nModel Weights Sample:")
+    print_weights(m, "lm_head")  # Print only lm_head weights, remove layer_name to print all
+    
     context = torch.zeros((1, 1), dtype=torch.long, device=device)
     print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
     #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
