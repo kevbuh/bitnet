@@ -18,9 +18,7 @@ chars = sorted(list(set(text)))
 vocab_size = len(chars)
 # create a mapping from characters to integers
 stoi = { ch:i for i,ch in enumerate(chars) }
-itos = { i:ch for i,ch in enumerate(chars) }
 encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
-decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
 
 # Train and test splits
 data = torch.tensor(encode(text), dtype=torch.long)
@@ -39,18 +37,25 @@ def get_batch(split):
     return x, y
 
 @torch.no_grad()
-def estimate_loss():
+def estimate_loss(cached_batches=None):
     out = {}
     model.eval()
+    
+    # Use cached batches if provided, otherwise create new ones
+    if cached_batches is None:
+        cached_batches = {}
+        for split in ['train', 'val']: cached_batches[split] = [get_batch(split) for _ in range(eval_iters)]
+    
     for split in ['train', 'val']:
-        losses = torch.zeros(eval_iters)
-        for k in range(eval_iters):
-            X, Y = get_batch(split)
+        losses = torch.zeros(min(eval_iters, len(cached_batches[split])))
+        for k, (X, Y) in enumerate(cached_batches[split]):
+            if k >= eval_iters: break
             logits, loss = model(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean()
+    
     model.train()
-    return out
+    return out, cached_batches
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -184,23 +189,32 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
     
-
+def generate_output(m):
+    print("decoding...")
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    chars = sorted(list(set(text)))
+    itos = { i:ch for i,ch in enumerate(chars) }
+    decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
+    output = decode(m.generate(context, max_new_tokens=block_size)[0].tolist())
+    print(output)
+    # open('output.txt', 'w').write(output)
 
 if __name__ == "__main__":
     # hyperparameters
     batch_size = 16 # how many independent sequences will we process in parallel?
     block_size = 256 # what is the maximum context length for predictions?
-    max_iters = 500
+    max_iters = 100
     eval_interval = 500
     learning_rate = 3e-4
     device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     # device = 'cpu'
     print(f"Using device: {device}")
-    eval_iters = 200
+    eval_iters = 50
     n_embd = 384
     n_head = 6
     n_layer = 6
     dropout = 0.2
+    cached_batches = None
     # ------------
     model = GPTLanguageModel()
     m = model.to(device)
@@ -211,16 +225,10 @@ if __name__ == "__main__":
     # ------------
     print(f"Training for {max_iters} iterations")
     for iter in tqdm(range(max_iters), desc='Training Iterations'):
-        evaluate_and_print_loss(iter, eval_interval, max_iters, model, estimate_loss)
+        if iter % eval_interval == 0 or iter == max_iters - 1:
+            loss_dict, cached_batches = estimate_loss(cached_batches)
+            print(f"step {iter}: train loss {loss_dict['train']:.4f}, val loss {loss_dict['val']:.4f}")
         xb, yb = get_batch('train')
         loss = training_step(model, xb, yb, optimizer)
-    
-    print("\nModel Weights Sample:")
-    print_weights(m, "lm_head")  # Print only lm_head weights, remove layer_name to print all
-    
-    context = torch.zeros((1, 1), dtype=torch.long, device=device)
-    print(decode(m.generate(context, max_new_tokens=500)[0].tolist()))
-    #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
-
-
-# Training Iterations:  10%|████▌                                         | 500/5000 [04:24<39:32,  1.90it/s]step 500: train loss 1.7388, val loss 1.8937
+    print_weights(m)
+    generate_output(m)

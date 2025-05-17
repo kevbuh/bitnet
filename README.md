@@ -5,7 +5,7 @@
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
 
-This repo uses [karpathy's GPT](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py) with the modified nn.Linear layer.
+Note: this repo is a work-in-progress and currently uses [karpathy's GPT](https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py) with the modified BitNet nn.Linear layer.
 
 tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
