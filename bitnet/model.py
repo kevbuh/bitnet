@@ -2,13 +2,12 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-# from bitLinear import BitLinear
-from tqdm import tqdm
-import time
 
+from tqdm import tqdm
+from utils import print_model_params, training_step, evaluate_and_print_loss, print_weights
 from BitLinear import BitLinear
 
-torch.manual_seed(1337)
+# torch.manual_seed(1337)
 
 # wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
 with open('data/input.txt', 'r', encoding='utf-8') as f:
@@ -184,10 +183,12 @@ class GPTLanguageModel(nn.Module):
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
+    
+
 
 if __name__ == "__main__":
     # hyperparameters
-    batch_size = 32 # how many independent sequences will we process in parallel?
+    batch_size = 16 # how many independent sequences will we process in parallel?
     block_size = 256 # what is the maximum context length for predictions?
     max_iters = 500
     eval_interval = 500
@@ -201,42 +202,18 @@ if __name__ == "__main__":
     n_layer = 6
     dropout = 0.2
     # ------------
-
     model = GPTLanguageModel()
     m = model.to(device)
-    # m = torch.compile(m)
-    # print the number of parameters in the model
-    print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
-    # create a PyTorch optimizer
+    if torch.cuda.is_available(): m = torch.compile(m)
+    print_model_params(m)
+    if torch.cuda.is_available(): training_step = torch.compile(training_step)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    # ------------
     print(f"Training for {max_iters} iterations")
     for iter in tqdm(range(max_iters), desc='Training Iterations'):
-        start_time = time.time()  # Record start time
-        # every once in a while evaluate the loss on train and val sets
-        if iter != 0:
-            if iter % eval_interval == 0 or iter == max_iters - 1:
-                losses = estimate_loss()
-                print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-        # sample a batch of data
+        evaluate_and_print_loss(iter, eval_interval, max_iters, model, estimate_loss)
         xb, yb = get_batch('train')
-        # evaluate the loss
-        logits, loss = model(xb, yb)
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-        end_time = time.time()  # Record end time
-        step_time = end_time - start_time  # Calculate duration
-        print(f"Time taken for step {iter}: {step_time:.4f} seconds")
-    # generate from the model
-    
-    # Print model weights
-    def print_weights(model, layer_name=None):
-        for name, param in model.named_parameters():
-            if layer_name is None or layer_name in name:
-                print(f"Layer: {name}, Shape: {param.shape}")
-                print(f"Sample weights: {param.data.flatten()[:5]}...")
-                print(f"Stats: min={param.data.min().item():.4f}, max={param.data.max().item():.4f}, mean={param.data.mean().item():.4f}")
-                print("-" * 50)
+        loss = training_step(model, xb, yb, optimizer)
     
     print("\nModel Weights Sample:")
     print_weights(m, "lm_head")  # Print only lm_head weights, remove layer_name to print all
