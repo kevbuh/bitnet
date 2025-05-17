@@ -189,15 +189,22 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
     
-def generate_output(m):
-    print("decoding...")
-    context = torch.zeros((1, 1), device=device)
-    chars = sorted(list(set(text)))
-    itos = { i:ch for i,ch in enumerate(chars) }
-    decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
-    output = decode(m.generate(context, max_new_tokens=block_size)[0].tolist())
-    print(output)
-    # open('output.txt', 'w').write(output)
+    @timeit
+    def generate_stream(model, max_new_tokens):
+        model.eval()
+        idx = torch.zeros((1, 1), device=device, dtype=torch.long)  # initialize context
+        chars = sorted(list(set(text)))  # build your id→char map
+        itos = { i: ch for i, ch in enumerate(chars) }
+        print("decoding…", flush=True)
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -block_size:]  # crop to last block_size tokens
+            logits, _ = model(idx_cond)
+            logits = logits[:, -1, :]  # (1, vocab_size)
+            probs = F.softmax(logits, dim=-1)  # (1, vocab_size)
+            idx_next = torch.multinomial(probs, num_samples=1)  # (1,1)
+            idx = torch.cat([idx, idx_next], dim=1)
+            print(itos[idx_next.item()], end='', flush=True)
+        print()
 
 if __name__ == "__main__":
     # hyperparameters
@@ -224,11 +231,11 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     # ------------
     print(f"Training for {max_iters} iterations")
-    for iter in tqdm(range(max_iters), desc='Training Iterations'):
+    for iter in tqdm(range(max_iters)):
         if iter % eval_interval == 0 or iter == max_iters - 1:
             loss_dict, cached_batches = estimate_loss(cached_batches)
             print(f"step {iter}: train loss {loss_dict['train']:.4f}, val loss {loss_dict['val']:.4f}")
         xb, yb = get_batch('train')
         loss = training_step(model, xb, yb, optimizer)
     print_weights(m)
-    timeit(generate_output(m))
+    m.generate_stream(block_size)

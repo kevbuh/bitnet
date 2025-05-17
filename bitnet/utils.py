@@ -30,7 +30,7 @@ def timeit(func):
     result = func(*args, **kwargs)
     end_time = time.time()
     step_time = end_time - start_time
-    print(f"Time taken for step: {step_time:.4f} seconds")
+    print(f"TIMEIT: {step_time:.4f} seconds")
     return result
   return wrapper
 
@@ -53,5 +53,5 @@ def print_weights(model, layer_name=None):
   print("\nModel Weights:")
   for name, param in model.named_parameters():
     # if layer_name is None or layer_name in name:
-    print(f"Layer: {name}, Shape: {param.shape} Stats: min={param.data.min().item():.4f}, max={param.data.max().item():.4f}, mean={param.data.mean().item():.4f} Weights: {param.data.flatten()[:5]}...")
+    print(f"Layer: {name:<20} Shape: {str(param.shape):<20} Stats: min={param.data.min().item():<10.4f} max={param.data.max().item():<10.4f} mean={param.data.mean().item():<10.4f} Weights: {str(param.data.flatten()[:5]):<30}...")
     # print("-" * 50)
