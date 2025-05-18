@@ -189,17 +189,17 @@ def calculate_model_size_in_gb(model):
 if __name__ == "__main__":
     # ------------
     # hyperparameters
-    batch_size = 1 # how many independent sequences will we process in parallel?
-    max_iters = 10000
+    batch_size = 4 # how many independent sequences will we process in parallel?
+    max_iters = 100
     eval_interval = 100
-    eval_iters = 50
-    learning_rate = 1.2*10e-3
+    
     # device = 'cpu'
     device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     # ------------
     # archiparameters
     if DEBUG: # because i'm gpu poor
+        learning_rate = 3e-4
         n_embd      = 1024          # hidden size
         n_head      = 16            # total attention heads
         n_kv_head   = 4             # GQA: ¼ of heads carry K & V
@@ -209,6 +209,7 @@ if __name__ == "__main__":
         vocab_size  = 128_256       # keep full vocab, or reduce to ~32 k if you like
         block_size  = 512           # context length
     else:
+        learning_rate = 1.2*10e-3
         n_embd      = 2560          # hidden size d
         n_head      = 32            # total attention heads
         n_kv_head   = 8             # GQA: heads that carry K & V
