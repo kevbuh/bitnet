@@ -419,7 +419,11 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
-- Full model file
+- Finish bitnet
+  - Llama 3 tokenizer
+  - RoPE
+  - ReLU² activation in FFN layers
+  - subln normalization
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
