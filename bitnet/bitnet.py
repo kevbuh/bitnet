@@ -190,24 +190,24 @@ if __name__ == "__main__":
     # ------------
     # hyperparameters
     batch_size = 1 # how many independent sequences will we process in parallel?
-    max_iters = 5
-    eval_interval = 500
+    max_iters = 10000
+    eval_interval = 100
     eval_iters = 50
     learning_rate = 1.2*10e-3
-    # device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    # device = 'cpu'
+    device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     # ------------
-    # archparameters
+    # archiparameters
     if DEBUG: # because i'm gpu poor
-        n_embd      = 512           # hidden size
-        n_head      = 8             # total attention heads
-        n_kv_head   = 2             # GQA: ¼ of heads carry K & V
+        n_embd      = 1024          # hidden size
+        n_head      = 16            # total attention heads
+        n_kv_head   = 4             # GQA: ¼ of heads carry K & V
         head_dim    = n_embd // n_head   # 64
-        ffn_dim     = 2048          # 4× d_model
-        n_layer     = 4             # number of transformer blocks
+        ffn_dim     = 4096          # 4× d_model
+        n_layer     = 8             # number of transformer blocks
         vocab_size  = 128_256       # keep full vocab, or reduce to ~32 k if you like
-        block_size  = 256           # context length
+        block_size  = 512           # context length
     else:
         n_embd      = 2560          # hidden size d
         n_head      = 32            # total attention heads
