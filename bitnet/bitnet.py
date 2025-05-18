@@ -37,27 +37,6 @@ def get_batch(split):
     y = torch.stack([data[i+1:i+block_size+1] for i in ix])
     x, y = x.to(device), y.to(device)
     return x, y
-
-@torch.no_grad()
-def estimate_loss(cached_batches=None):
-    out = {}
-    model.eval()
-    
-    # Use cached batches if provided, otherwise create new ones
-    if cached_batches is None:
-        cached_batches = {}
-        for split in ['train', 'val']: cached_batches[split] = [get_batch(split) for _ in range(eval_iters)]
-    
-    for split in ['train', 'val']:
-        losses = torch.zeros(min(eval_iters, len(cached_batches[split])))
-        for k, (X, Y) in enumerate(cached_batches[split]):
-            if k >= eval_iters: break
-            logits, loss = model(X, Y)
-            losses[k] = loss.item()
-        out[split] = losses.mean()
-    
-    model.train()
-    return out, cached_batches
     
 class RotaryMHA(nn.Module):
     def __init__(self, d_model, n_head, n_kv_head):
@@ -69,7 +48,6 @@ class RotaryMHA(nn.Module):
         self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
         self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
         self.o_proj = BitLinear(d_model, d_model, bias=False)               # 2560×2560
-        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
         B, T, _ = x.shape
@@ -94,14 +72,22 @@ class RotaryMHA(nn.Module):
         out   = (attn @ v).transpose(1, 2).reshape(B, T, -1)       # back to B, T, 2560
         return self.o_proj(out)
 
-class SwiGLUFFN(nn.Module):
+class ReLUSq(nn.Module):
+    def forward(self, x):
+        return F.relu(x) ** 2
+
+class ReLUSqFFN(nn.Module):
     def __init__(self, d_model, hidden_dim):
         super().__init__()
-        self.gate_proj = BitLinear(d_model, hidden_dim, bias=False)
-        self.up_proj   = BitLinear(d_model, hidden_dim, bias=False)
-        self.down_proj = BitLinear(hidden_dim, d_model, bias=False)
+        self.fc1 = BitLinear(d_model, hidden_dim, bias=False)
+        self.act = ReLUSq()
+        self.fc2 = BitLinear(hidden_dim, d_model, bias=False)
+
     def forward(self, x):
-        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.fc2(x)
+        return x
 
 class SubLayerNorm(nn.Module):
     def __init__(self, dim, eps=1e-6, elementwise_affine=True):
@@ -127,7 +113,7 @@ class Block(nn.Module):
         self.input_ln   = SubLayerNorm(n_embd)
         self.attn       = RotaryMHA(n_embd, n_head, n_kv_head)
         self.post_ln    = SubLayerNorm(n_embd)
-        self.mlp        = SwiGLUFFN(n_embd, ffn_dim)
+        self.mlp        = ReLUSqFFN(n_embd, ffn_dim)
     def forward(self, x):
         x = x + self.attn(self.input_ln(x))
         x = x + self.mlp(self.post_ln(x))
@@ -210,40 +196,49 @@ if __name__ == "__main__":
     max_iters = 100
     eval_interval = 500
     eval_iters = 50
-    learning_rate = 3e-4
+    learning_rate = 1.2*10e-3
     # device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     device = 'cpu'
     print(f"Using device: {device}")
     # ------------
     # archparameters
-    n_embd      = 2560          # hidden size d
-    n_head      = 32            # total attention heads
-    n_kv_head   = 8             # GQA: heads that carry K & V
-    head_dim    = n_embd // n_head # 80
-    ffn_dim     = 6912
-    n_layer     = 30
-    vocab_size  = 128_256
-    block_size  = 2048          # anything ≥ max context used in training
-    dropout     = 0.0           # llama uses no dropout after pre-training
-    cached_batches = None
+    if DEBUG: # because im gpu poor
+        n_embd      = 512           # hidden size
+        n_head      = 8             # total attention heads
+        n_kv_head   = 2             # GQA: ¼ of heads carry K & V
+        head_dim    = n_embd // n_head   # 64
+        ffn_dim     = 2048          # 4× d_model
+        n_layer     = 4             # number of transformer blocks
+        vocab_size  = 128_256       # keep full vocab, or reduce to ~32 k if you like
+        block_size  = 256           # context length
+    else:
+        n_embd      = 2560          # hidden size d
+        n_head      = 32            # total attention heads
+        n_kv_head   = 8             # GQA: heads that carry K & V
+        head_dim    = n_embd // n_head # 80
+        ffn_dim     = 6912
+        n_layer     = 30
+        vocab_size  = 128_256
+        block_size  = 2048          # anything ≥ max context used in training
     # ------------
     model = GPTLanguageModel()
-    calculate_model_size_in_gb(model)
     m = model.to(device).bfloat16()
-    if torch.cuda.is_available(): m = torch.compile(m)
-    print_model_params(m)
-    if torch.cuda.is_available(): training_step = torch.compile(training_step)
+    if torch.cuda.is_available(): 
+        m = torch.compile(m)
+        training_step = torch.compile(training_step)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     # ------------
+    if DEBUG:
+        print_model_params(m)
+        calculate_model_size_in_gb(model)
     print(f"Training for {max_iters} iterations")
     for iter in tqdm(range(max_iters)):
         xb, yb = get_batch('train')
-        # if DEBUG:
-        #     if iter % eval_interval == 0 or iter == max_iters - 1:
-        #         # loss_dict, cached_batches = estimate_loss(cached_batches)
-        #         with torch.no_grad():
-        #             logits, loss = model(xb, yb)
-        #             print(f"step {iter}: train loss {loss:.4f}")
+        if DEBUG:
+            if iter % eval_interval == 0 or iter == max_iters - 1:
+                with torch.no_grad():
+                    logits, loss = model(xb, yb)
+                    print(f"step {iter}: train loss {loss:.4f}")
         training_step(model, xb, yb, optimizer)
     if DEBUG: print_weights(m)
     m.stream_output(block_size)

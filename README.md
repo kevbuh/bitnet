@@ -421,7 +421,6 @@ model.norm.weight                               torch.Size([2560])         2560 
 # Todo
 - Correct bitnet
   - Llama 3 tokenizer
-  - RoPE
   - ReLU² activation in FFN layers
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
