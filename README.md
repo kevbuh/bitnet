@@ -419,7 +419,7 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
-- Finish bitnet
+- Correct bitnet
   - Llama 3 tokenizer
   - RoPE
   - ReLU² activation in FFN layers
