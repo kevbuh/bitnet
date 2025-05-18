@@ -34,12 +34,16 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
 - Parameters: ~2 Billion
 - Training Tokens: 4 Trillion
 - Context Length: Maximum sequence length of 4096 tokens.
+- Weights: 1.58-bit with 8-bit activations (W1.58A8)
 - Transformer-based:
     - modified with BitLinear layers
     - Uses Rotary Position Embeddings (RoPE).
     - Uses squared ReLU (ReLU²) activation in FFN layers.
-    - Employs subln normalization.
+    - Employs [subln](https://proceedings.mlr.press/v202/wang23u.html) normalization.
     - No bias terms in linear or normalization layers.
+- Tokenizer: LLaMA 3 Tokenizer (vocab size: 128,256)
+- Model: Based off of LLaMa 3?
+- STE: Straight-through-Estimator to approximate gradients for non-differentiable functions like clip()
 
 # Model Architecture
 
@@ -417,9 +421,14 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
+- Full model file
+- Binary kernels (triton?):
+  - ternary weight matrix–vector product into two binary matmuls plus a subtraction
+  - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
 - Test performance against huggingface and Microsoft bitnet.cpp
 - Make new hardware for it (fpga)
   - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
-- Make a novel 1-bit Mixture-of-Experts (MoE)
+  - https://www.xilinx.com/publications/presentations/binary-networks-on-fpgas-sjsu-bnn-dec-2016.pdf
+- Make 1-bit Mixture-of-Experts (MoE)
 - Set up custom installation script thats nice and says jax or torch and which models to run 
-- make {0,1} model work
+<!-- - make binary {0,1} model work -->

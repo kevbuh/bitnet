@@ -177,36 +177,38 @@ class GPTLanguageModel(nn.Module):
     def generate(self, idx, max_new_tokens):
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
-            # crop idx to the last block_size tokens
-            idx_cond = idx[:, -block_size:]
-            # get the predictions
-            logits, loss = self(idx_cond)
-            # focus only on the last time step
-            logits = logits[:, -1, :] # becomes (B, C)
-            # apply softmax to get probabilities
-            probs = F.softmax(logits, dim=-1) # (B, C)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
-            # append sampled index to the running sequence
-            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
+            idx_cond = idx[:, -block_size:] # crop idx to the last block_size tokens
+            logits, loss = self(idx_cond) # get the predictions
+            logits = logits[:, -1, :] # becomes (B, C), focus only on the last time step
+            probs = F.softmax(logits, dim=-1) # (B, C), apply softmax to get probabilities
+            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1), sample from the distribution
+            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1), append sampled index to the running sequence
         return idx
     
     @timeit(debug=DEBUG)
     def stream_output(self, max_new_tokens):
         model.eval()
-        idx = torch.zeros((1, 1), device=device, dtype=torch.long)  # initialize context
-        chars = sorted(list(set(text)))  # build your id→char map
+        idx = torch.zeros((1, 1), device=device, dtype=torch.long) # initialize context
+        chars = sorted(list(set(text))) # build your id→char map
         itos = { i: ch for i, ch in enumerate(chars) }
         print("decoding…", flush=True)
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block_size:]  # crop to last block_size tokens
+            idx_cond = idx[:, -block_size:] # crop to last block_size tokens
             logits, _ = self(idx_cond)
-            logits = logits[:, -1, :]  # (1, vocab_size)
-            probs = F.softmax(logits, dim=-1)  # (1, vocab_size)
-            idx_next = torch.multinomial(probs, num_samples=1)  # (1,1)
+            logits = logits[:, -1, :] # (1, vocab_size)
+            probs = F.softmax(logits, dim=-1) # (1, vocab_size)
+            idx_next = torch.multinomial(probs, num_samples=1) # (1,1)
             idx = torch.cat([idx, idx_next], dim=1)
             print(itos[idx_next.item()], end='', flush=True)
         print()
+
+def calculate_model_size_in_gb(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    # Assuming float32, which is 4 bytes per parameter
+    total_size_bytes = total_params * 4
+    total_size_gb = total_size_bytes / (1024 ** 3)
+    print(f"Model size: {total_size_gb:.2f} GB")
+    return total_size_gb
 
 if __name__ == "__main__":
     # ------------
@@ -227,6 +229,7 @@ if __name__ == "__main__":
     cached_batches = None
     # ------------
     model = GPTLanguageModel()
+    calculate_model_size_in_gb(model)
     m = model.to(device)
     if torch.cuda.is_available(): m = torch.compile(m)
     print_model_params(m)

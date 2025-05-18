@@ -1,5 +1,6 @@
-from safetensors import safe_open
 import re
+import os
+from safetensors import safe_open
 
 file_path = 'data/model.safetensors'
 with safe_open(file_path, framework="pt") as f:
@@ -21,3 +22,14 @@ with safe_open(file_path, framework="pt") as f:
         print(f"{layer_name:<{max_length}} {str(weights.shape):<{max_shape_length}} {num_parameters:<{max_num_params_length}} {weights.flatten()[:5].tolist()}")
         total_num_parameters += num_parameters
     print(f"Total number of parameters: {total_num_parameters}") # 2_412_820_480 parameters
+
+    file_size = os.path.getsize(file_path)
+    file_size_gb = file_size / (1024 ** 3)
+    print(f"Model size: {file_size_gb:.2f} GB")
+
+# NOTE: inference code contains 'packed-weight' uint8's from https://huggingface.co/microsoft/bitnet-b1.58-2B-4T
+# from safetensors import safe_open
+# f = safe_open("bitnet-b1.58-2B-4T/model.safetensors","pt")
+# for k in list(f.keys())[:4]:
+#     t = f.get_tensor(k)
+#     print(f"name={k} dtype={t.dtype} shape={t.shape} unique_values={t.unique()[:5]}")
