@@ -23,24 +23,21 @@ import time
 def print_model_params(m):
   print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
 
-def timeit(func):
-  """Decorator to time a function's execution."""
-  def wrapper(*args, **kwargs):
-    start_time = time.time()
-    result = func(*args, **kwargs)
-    end_time = time.time()
-    step_time = end_time - start_time
-    print(f"TIMEIT: {step_time:.4f} seconds")
-    return result
-  return wrapper
+def timeit(debug):
+    """Decorator factory to time a function's execution."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            step_time = end_time - start_time
+            if debug:
+                print(f"TIMEIT: {step_time:.4f} seconds")
+            return result
+        return wrapper
+    return decorator
 
-def evaluate_and_print_loss(iter, eval_interval, max_iters, model, estimate_loss):
-    """Evaluate and print the training and validation loss."""
-    if iter != 0 and (iter % eval_interval == 0 or iter == max_iters - 1):
-        losses = estimate_loss()
-        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-
-@timeit
+@timeit(debug=False)
 def training_step(model, xb, yb, optimizer):
   # evaluate the loss
   logits, loss = model(xb, yb)
@@ -49,9 +46,6 @@ def training_step(model, xb, yb, optimizer):
   optimizer.step()
   return loss
 
-def print_weights(model, layer_name=None):
-  print("\nModel Weights:")
+def print_weights(model):
   for name, param in model.named_parameters():
-    # if layer_name is None or layer_name in name:
     print(f"Layer: {name:<20} Shape: {str(param.shape):<20} Stats: min={param.data.min().item():<10.4f} max={param.data.max().item():<10.4f} mean={param.data.mean().item():<10.4f} Weights: {str(param.data.flatten()[:5]):<30}...")
-    # print("-" * 50)

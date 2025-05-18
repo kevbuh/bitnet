@@ -2,12 +2,13 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import wandb
 
 from tqdm import tqdm
 from utils import print_model_params, training_step, print_weights, timeit
 from BitLinear import BitLinear
 
-# torch.manual_seed(1337)
+DEBUG = True
 
 # wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
 with open('data/input.txt', 'r', encoding='utf-8') as f:
@@ -172,6 +173,7 @@ class GPTLanguageModel(nn.Module):
             loss = F.cross_entropy(logits, targets)
         return logits, loss
 
+    @timeit(debug=DEBUG)
     def generate(self, idx, max_new_tokens):
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
@@ -189,8 +191,8 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
         return idx
     
-    @timeit
-    def generate_stream(model, max_new_tokens):
+    @timeit(debug=DEBUG)
+    def stream_output(self, max_new_tokens):
         model.eval()
         idx = torch.zeros((1, 1), device=device, dtype=torch.long)  # initialize context
         chars = sorted(list(set(text)))  # build your id→char map
@@ -198,7 +200,7 @@ class GPTLanguageModel(nn.Module):
         print("decoding…", flush=True)
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -block_size:]  # crop to last block_size tokens
-            logits, _ = model(idx_cond)
+            logits, _ = self(idx_cond)
             logits = logits[:, -1, :]  # (1, vocab_size)
             probs = F.softmax(logits, dim=-1)  # (1, vocab_size)
             idx_next = torch.multinomial(probs, num_samples=1)  # (1,1)
@@ -207,16 +209,17 @@ class GPTLanguageModel(nn.Module):
         print()
 
 if __name__ == "__main__":
+    # ------------
     # hyperparameters
     batch_size = 16 # how many independent sequences will we process in parallel?
     block_size = 256 # what is the maximum context length for predictions?
     max_iters = 100
     eval_interval = 500
+    eval_iters = 50
     learning_rate = 3e-4
     device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
     # device = 'cpu'
     print(f"Using device: {device}")
-    eval_iters = 50
     n_embd = 384
     n_head = 6
     n_layer = 6
@@ -232,10 +235,13 @@ if __name__ == "__main__":
     # ------------
     print(f"Training for {max_iters} iterations")
     for iter in tqdm(range(max_iters)):
-        if iter % eval_interval == 0 or iter == max_iters - 1:
-            loss_dict, cached_batches = estimate_loss(cached_batches)
-            print(f"step {iter}: train loss {loss_dict['train']:.4f}, val loss {loss_dict['val']:.4f}")
         xb, yb = get_batch('train')
-        loss = training_step(model, xb, yb, optimizer)
-    print_weights(m)
-    m.generate_stream(block_size)
+        if DEBUG:
+            if iter % eval_interval == 0 or iter == max_iters - 1:
+                # loss_dict, cached_batches = estimate_loss(cached_batches)
+                with torch.no_grad():
+                    logits, loss = model(xb, yb)
+                    print(f"step {iter}: train loss {loss:.4f}")
+        training_step(model, xb, yb, optimizer)
+    if DEBUG: print_weights(m)
+    m.stream_output(block_size)
