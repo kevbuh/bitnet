@@ -37,7 +37,7 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
     - modified with BitLinear layers
     - Uses Rotary Position Embeddings (RoPE).
     - Uses squared ReLU (ReLU²) activation in FFN layers.
-    - Employs [subln](https://proceedings.mlr.press/v202/wang23u.html) normalization.
+    - Employs [Sub-LayerNorm](https://proceedings.mlr.press/v202/wang23u.html) normalization.
     - No bias terms in linear or normalization layers.
 - Tokenizer: LLaMA 3 Tokenizer (vocab size: 128,256)
 - Model: Based off of LLaMa 3?
@@ -423,7 +423,6 @@ model.norm.weight                               torch.Size([2560])         2560 
   - Llama 3 tokenizer
   - RoPE
   - ReLU² activation in FFN layers
-  - subln normalization
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels

@@ -102,22 +102,31 @@ class SwiGLUFFN(nn.Module):
         self.down_proj = BitLinear(hidden_dim, d_model, bias=False)
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
-    
-class RMSNorm(nn.Module):
-    def __init__(self, dim, eps=1e-6):
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(dim))
-        self.eps = eps
-    def forward(self, x):
-        norm = x.pow(2).mean(-1, keepdim=True).rsqrt()
-        return self.weight * x * norm
 
+class SubLayerNorm(nn.Module):
+    def __init__(self, dim, eps=1e-6, elementwise_affine=True):
+        super().__init__()
+        self.eps = eps
+        if elementwise_affine:
+            self.gamma = nn.Parameter(torch.ones(dim))
+            self.beta  = nn.Parameter(torch.zeros(dim))
+        else:
+            self.register_parameter('gamma', None)
+            self.register_parameter('beta',  None)
+
+    def forward(self, x):
+        mean = x.mean(-1, keepdim=True) # Compute mean over last dimension
+        var = (x - mean).pow(2).mean(-1, keepdim=True) # Compute variance over last dimension
+        x_norm = (x - mean) / torch.sqrt(var + self.eps) # Normalize: zero-mean, unit-variance
+        if self.gamma is not None: x_norm = x_norm * self.gamma + self.beta # Apply affine if present
+        return x_norm
+    
 class Block(nn.Module):
     def __init__(self):
         super().__init__()
-        self.input_ln   = RMSNorm(n_embd)
+        self.input_ln   = SubLayerNorm(n_embd)
         self.attn       = RotaryMHA(n_embd, n_head, n_kv_head)
-        self.post_ln    = RMSNorm(n_embd)
+        self.post_ln    = SubLayerNorm(n_embd)
         self.mlp        = SwiGLUFFN(n_embd, ffn_dim)
     def forward(self, x):
         x = x + self.attn(self.input_ln(x))
@@ -130,7 +139,7 @@ class GPTLanguageModel(nn.Module):
         self.embed_tokens = nn.Embedding(vocab_size, n_embd)
         self.pos_embed    = nn.Parameter(torch.zeros(block_size, n_embd))  # learned rope alt.
         self.layers       = nn.ModuleList([Block() for _ in range(n_layer)])
-        self.ln_f         = RMSNorm(n_embd)
+        self.ln_f         = SubLayerNorm(n_embd)
         self.lm_head      = BitLinear(n_embd, vocab_size, bias=False)
 
         self.apply(self._init_weights)
