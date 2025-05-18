@@ -6,8 +6,6 @@ from torch.nn import functional as F
 from tqdm import tqdm
 from BitLinear import BitLinear
 from utils import print_model_params, training_step, print_weights, timeit
-import torch.multiprocessing as mp
-mp.set_sharing_strategy('file_system')
 
 DEBUG = True
 
@@ -127,7 +125,6 @@ class GPTLanguageModel(nn.Module):
         self.layers       = nn.ModuleList([Block() for _ in range(n_layer)])
         self.ln_f         = SubLayerNorm(n_embd)
         self.lm_head      = BitLinear(n_embd, vocab_size, bias=False)
-
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -152,7 +149,7 @@ class GPTLanguageModel(nn.Module):
             loss = F.cross_entropy(logits, targets)
         return logits, loss
 
-    @timeit(debug=DEBUG)
+    @timeit()
     def generate(self, idx, max_new_tokens):
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
@@ -164,7 +161,7 @@ class GPTLanguageModel(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1) # (B, T+1), append sampled index to the running sequence
         return idx
     
-    @timeit(debug=DEBUG)
+    @timeit()
     def stream_output(self, max_new_tokens):
         model.eval()
         idx = torch.zeros((1, 1), device=device, dtype=torch.long) # initialize context
@@ -193,7 +190,7 @@ if __name__ == "__main__":
     # ------------
     # hyperparameters
     batch_size = 1 # how many independent sequences will we process in parallel?
-    max_iters = 100
+    max_iters = 5
     eval_interval = 500
     eval_iters = 50
     learning_rate = 1.2*10e-3
@@ -202,7 +199,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     # ------------
     # archparameters
-    if DEBUG: # because im gpu poor
+    if DEBUG: # because i'm gpu poor
         n_embd      = 512           # hidden size
         n_head      = 8             # total attention heads
         n_kv_head   = 2             # GQA: ¼ of heads carry K & V

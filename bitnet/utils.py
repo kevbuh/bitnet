@@ -25,7 +25,7 @@ def print_model_params(m):
   if num_params >= 1e9: print(num_params / 1e9, 'B parameters')
   else: print(num_params / 1e6, 'M parameters')
 
-def timeit(debug):
+def timeit():
     """Decorator factory to time a function's execution."""
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -33,13 +33,12 @@ def timeit(debug):
             result = func(*args, **kwargs)
             end_time = time.time()
             step_time = end_time - start_time
-            if debug:
-                print(f"TIMEIT: {step_time:.4f} seconds")
+            print(f"TIMEIT: {step_time:.4f} seconds")
             return result
         return wrapper
     return decorator
 
-@timeit(debug=False)
+@timeit()
 def training_step(model, xb, yb, optimizer):
   # evaluate the loss
   logits, loss = model(xb, yb)

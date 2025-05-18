@@ -419,16 +419,13 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
-- Correct bitnet
-  - Llama 3 tokenizer
-  - ReLU² activation in FFN layers
+- Correct BitNet
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
 - Test performance against huggingface and Microsoft bitnet.cpp
+- Set up custom installation script thats nice and says jax or torch and which models to run 
 - Make new hardware for it (fpga)
   - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
   - https://www.xilinx.com/publications/presentations/binary-networks-on-fpgas-sjsu-bnn-dec-2016.pdf
 - Make 1-bit Mixture-of-Experts (MoE)
-- Set up custom installation script thats nice and says jax or torch and which models to run 
-<!-- - make binary {0,1} model work -->
