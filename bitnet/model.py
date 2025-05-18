@@ -1,41 +1,10 @@
-# https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from tqdm import tqdm
 from BitLinear import BitLinear
-from utils import print_model_params, training_step, print_weights, timeit
+from utils import timeit
 
-DEBUG = True
-
-# wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
-with open('data/input.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
-
-# here are all the unique characters that occur in this text
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
-# create a mapping from characters to integers
-stoi = { ch:i for i,ch in enumerate(chars) }
-encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
-
-# Train and test splits
-data = torch.tensor(encode(text), dtype=torch.long)
-n = int(0.9*len(data)) # first 90% will be train, rest val
-train_data = data[:n]
-val_data = data[n:]
-
-# data loading
-def get_batch(split):
-    # generate a small batch of data of inputs x and targets y
-    data = train_data if split == 'train' else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([data[i:i+block_size] for i in ix])
-    y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    x, y = x.to(device), y.to(device)
-    return x, y
-    
 class RotaryMHA(nn.Module):
     def __init__(self, d_model, n_head, n_kv_head):
         super().__init__()
@@ -106,7 +75,7 @@ class SubLayerNorm(nn.Module):
         return x_norm
     
 class Block(nn.Module):
-    def __init__(self):
+    def __init__(self, n_embd, n_head, n_kv_head, ffn_dim):
         super().__init__()
         self.input_ln   = SubLayerNorm(n_embd)
         self.attn       = RotaryMHA(n_embd, n_head, n_kv_head)
@@ -118,11 +87,12 @@ class Block(nn.Module):
         return x
 
 class GPTLanguageModel(nn.Module):
-    def __init__(self):
+    def __init__(self, vocab_size, n_embd, block_size, n_layer, n_head, n_kv_head, ffn_dim):
         super().__init__()
+        self.block_size = block_size
         self.embed_tokens = nn.Embedding(vocab_size, n_embd)
         self.pos_embed    = nn.Parameter(torch.zeros(block_size, n_embd))  # learned rope alt.
-        self.layers       = nn.ModuleList([Block() for _ in range(n_layer)])
+        self.layers       = nn.ModuleList([Block(n_embd, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
         self.ln_f         = SubLayerNorm(n_embd)
         self.lm_head      = BitLinear(n_embd, vocab_size, bias=False)
         self.apply(self._init_weights)
@@ -153,7 +123,7 @@ class GPTLanguageModel(nn.Module):
     def generate(self, idx, max_new_tokens):
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block_size:] # crop idx to the last block_size tokens
+            idx_cond = idx[:, -self.block_size:] # crop idx to the last block_size tokens
             logits, loss = self(idx_cond) # get the predictions
             logits = logits[:, -1, :] # becomes (B, C), focus only on the last time step
             probs = F.softmax(logits, dim=-1) # (B, C), apply softmax to get probabilities
@@ -162,14 +132,12 @@ class GPTLanguageModel(nn.Module):
         return idx
     
     @timeit()
-    def stream_output(self, max_new_tokens):
-        model.eval()
+    def stream_output(self, max_new_tokens, itos, device):
+        self.eval()
         idx = torch.zeros((1, 1), device=device, dtype=torch.long) # initialize context
-        chars = sorted(list(set(text))) # build your id→char map
-        itos = { i: ch for i, ch in enumerate(chars) }
         print("decoding…", flush=True)
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block_size:] # crop to last block_size tokens
+            idx_cond = idx[:, -self.block_size:] # crop to last block_size tokens
             logits, _ = self(idx_cond)
             logits = logits[:, -1, :] # (1, vocab_size)
             probs = F.softmax(logits, dim=-1) # (1, vocab_size)
@@ -184,59 +152,4 @@ def calculate_model_size_in_gb(model):
     total_size_bytes = total_params * 4
     total_size_gb = total_size_bytes / (1024 ** 3)
     print(f"Model size: {total_size_gb:.2f} GB")
-    return total_size_gb
-
-if __name__ == "__main__":
-    # ------------
-    # hyperparameters
-    batch_size = 4 # how many independent sequences will we process in parallel?
-    max_iters = 100
-    eval_interval = 100
-    
-    # device = 'cpu'
-    device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    # ------------
-    # archiparameters
-    if DEBUG: # because i'm gpu poor
-        learning_rate = 3e-4
-        n_embd      = 1024          # hidden size
-        n_head      = 16            # total attention heads
-        n_kv_head   = 4             # GQA: ¼ of heads carry K & V
-        head_dim    = n_embd // n_head   # 64
-        ffn_dim     = 4096          # 4× d_model
-        n_layer     = 8             # number of transformer blocks
-        vocab_size  = 128_256       # keep full vocab, or reduce to ~32 k if you like
-        block_size  = 512           # context length
-    else:
-        learning_rate = 1.2*10e-3
-        n_embd      = 2560          # hidden size d
-        n_head      = 32            # total attention heads
-        n_kv_head   = 8             # GQA: heads that carry K & V
-        head_dim    = n_embd // n_head # 80
-        ffn_dim     = 6912
-        n_layer     = 30
-        vocab_size  = 128_256
-        block_size  = 2048          # anything ≥ max context used in training
-    # ------------
-    model = GPTLanguageModel()
-    m = model.to(device).bfloat16()
-    if torch.cuda.is_available(): 
-        m = torch.compile(m)
-        training_step = torch.compile(training_step)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    # ------------
-    if DEBUG:
-        print_model_params(m)
-        calculate_model_size_in_gb(model)
-    print(f"Training for {max_iters} iterations")
-    for iter in tqdm(range(max_iters)):
-        xb, yb = get_batch('train')
-        if DEBUG:
-            if iter % eval_interval == 0 or iter == max_iters - 1:
-                with torch.no_grad():
-                    logits, loss = model(xb, yb)
-                    print(f"step {iter}: train loss {loss:.4f}")
-        training_step(model, xb, yb, optimizer)
-    if DEBUG: print_weights(m)
-    m.stream_output(block_size)
+    return total_size_gb 
