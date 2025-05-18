@@ -4,7 +4,6 @@ set -e
 python3 -m venv venv
 source venv/bin/activate
 
-
 pip install torch tqdm
 
 # weights: https://huggingface.co/microsoft/bitnet-b1.58-2B-4T/blob/main/model.safetensors
@@ -13,8 +12,7 @@ if [ -d "bitnet-b1.58-2B-4T" ]; then
 else
   echo "Downloading weights..."
   git lfs install
-  git clone https://huggingface.co/microsoft/bitnet-b1.58-2B-4T
-fi
+  git clone https://huggingface.co/microsoft/bitnet-b1.58-2B-4T-bf16
 
 echo "✅ Virtual environment created and dependencies installed."
 echo "To activate it later, run: source venv/bin/activate"
