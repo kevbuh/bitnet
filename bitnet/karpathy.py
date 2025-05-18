@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-import wandb
 
 from tqdm import tqdm
 from utils import print_model_params, training_step, print_weights, timeit
@@ -239,6 +238,7 @@ if __name__ == "__main__":
     print(f"Training for {max_iters} iterations")
     for iter in tqdm(range(max_iters)):
         xb, yb = get_batch('train')
+        print(f"xb.shape: {xb.shape}, yb.shape: {yb.shape}")
         if DEBUG:
             if iter % eval_interval == 0 or iter == max_iters - 1:
                 # loss_dict, cached_batches = estimate_loss(cached_batches)

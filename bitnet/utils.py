@@ -21,7 +21,9 @@ import time
 # print(get_model_params('700M'))
 
 def print_model_params(m):
-  print(sum(p.numel() for p in m.parameters())/1e6, 'M parameters')
+  num_params = sum(p.numel() for p in m.parameters())
+  if num_params >= 1e9: print(num_params / 1e9, 'B parameters')
+  else: print(num_params / 1e6, 'M parameters')
 
 def timeit(debug):
     """Decorator factory to time a function's execution."""
