@@ -64,6 +64,20 @@ def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
     print(f"Loaded checkpoint '{latest_checkpoint}' (epoch {epoch}, loss {loss:.4f})")
     return epoch, loss
 
+def validate(model, val_loader, device):
+    model.eval()
+    total_loss = 0
+    with torch.no_grad():
+        i = 0
+        for xb, yb in val_loader:
+            i += 1
+            if i > 20: break
+            xb, yb = xb.to(device), yb.to(device)
+            logits, loss = model(xb, yb)
+            total_loss += loss.item() * xb.size(0)
+    avg_loss = total_loss / i
+    return avg_loss
+
 def train():
     # ------------
     # hyperparameters
@@ -121,8 +135,8 @@ def train():
         if DEBUG and (it % eval_interval == 0 or it == max_iters - 1):
             with torch.no_grad():
                 logits, loss = model(xb, yb)
-                print(f"step {it}: train loss {loss:.4f}")
-                # Save checkpoint if current loss is the best we've seen
+                val_loss = validate(model, val_loader, device)
+                print(f"step {it}: train loss {loss:.4f}, validation loss {val_loss:.4f}")
                 if loss < best_loss:
                     best_loss = loss
                     save_checkpoint(model, optimizer, it, loss)
