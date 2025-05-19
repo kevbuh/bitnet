@@ -1,6 +1,6 @@
 # bitnet
 
-```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized Llama3-style LLM with 2.4B parameters trained on four trillion tokens. 
+```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM with 2.4B parameters trained on four trillion tokens. 
 - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers.
@@ -29,18 +29,16 @@ source venv/bin/activate
 
 Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
 
-- Parameters: ~2 Billion
-- Training Tokens: 4 Trillion
-- Context Length: Maximum sequence length of 4096 tokens.
+- Parameters: 2,412,820,480 (2.4B)
+- Context Length: 4096 tokens
 - Weights: 1.58-bit with 8-bit activations (W1.58A8)
-- Transformer-based:
+- Model: Based off of LLaMa-3
     - modified with BitLinear layers
-    - Uses Rotary Position Embeddings (RoPE).
-    - Uses squared ReLU (ReLU²) activation in FFN layers.
-    - Employs [Sub-LayerNorm](https://proceedings.mlr.press/v202/wang23u.html) normalization.
-    - No bias terms in linear or normalization layers.
+    - Uses Rotary Position Embeddings [(RoPE)](https://arxiv.org/abs/2104.09864).
+    - Uses squared ReLU [(ReLU²)](https://paperswithcode.com/method/squared-relu) activation in FFN layers
+    - Employs [Sub-LayerNorm](https://proceedings.mlr.press/v202/wang23u.html) normalization
+    - No bias terms in linear or normalization layers
 - Tokenizer: LLaMA 3 Tokenizer (vocab size: 128,256)
-- Model: Based off of LLaMa 3
 - STE: Straight-through-Estimator to approximate gradients for non-differentiable functions like clip()
 
 # Model Architecture
