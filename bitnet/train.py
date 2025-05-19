@@ -4,6 +4,7 @@ from tqdm import tqdm
 from utils import print_model_params, training_step, print_weights, calculate_model_size_in_gb
 from model import GPTLanguageModel
 import os
+import glob
 
 DEBUG = True
 
@@ -47,6 +48,21 @@ def save_checkpoint(model, optimizer, epoch, loss, checkpoint_dir='checkpoints')
         'loss': loss,
     }, checkpoint_path)
     print(f"Checkpoint saved: {checkpoint_path}")
+
+# Function to load the latest checkpoint
+def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, 'checkpoint_epoch_*.pt'))
+    if not checkpoint_files:
+        print("No checkpoints found.")
+        return 0, float('inf')
+    latest_checkpoint = max(checkpoint_files, key=os.path.getctime)
+    checkpoint = torch.load(latest_checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+    print(f"Loaded checkpoint '{latest_checkpoint}' (epoch {epoch}, loss {loss:.4f})")
+    return epoch, loss
 
 def train():
     # ------------
@@ -93,9 +109,10 @@ def train():
         calculate_model_size_in_gb(model)
     print(f"Training for {max_iters} iterations")
 
-    best_loss = float('inf')  # Initialize best loss for saving best model
+    # Load the latest checkpoint if available
+    start_epoch, best_loss = load_latest_checkpoint(model, optimizer)
 
-    for it in tqdm(range(max_iters)):
+    for it in tqdm(range(start_epoch, max_iters)):
         try: xb, yb = next(train_iter)
         except StopIteration:
             train_iter = iter(train_loader)
