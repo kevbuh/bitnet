@@ -87,14 +87,14 @@ class Block(nn.Module):
     return x
 
 class GPTLanguageModel(nn.Module):
-  def __init__(self, vocab_size, n_embd, block_size, n_layer, n_head, n_kv_head, ffn_dim):
+  def __init__(self, vocab_size, d_model, block_size, n_layer, n_head, n_kv_head, ffn_dim):
     super().__init__()
     self.block_size = block_size
-    self.embed_tokens = nn.Embedding(vocab_size, n_embd)
-    self.pos_embed    = nn.Parameter(torch.zeros(block_size, n_embd))  # learned rope alt.
-    self.layers       = nn.ModuleList([Block(n_embd, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
-    self.ln_f         = SubLayerNorm(n_embd)
-    self.lm_head      = BitLinear(n_embd, vocab_size, bias=False)
+    self.embed_tokens = nn.Embedding(vocab_size, d_model)
+    self.pos_embed    = nn.Parameter(torch.zeros(block_size, d_model))  # learned rope alt.
+    self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
+    self.ln_f         = SubLayerNorm(d_model)
+    self.lm_head      = BitLinear(d_model, vocab_size, bias=False)
     self.apply(self._init_weights)
 
   def _init_weights(self, module):
