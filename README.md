@@ -7,6 +7,14 @@
 
 tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
+# Setup
+
+```bash
+chmod +x setup.sh
+./setup.sh
+source venv/bin/activate
+```
+
 # Papers
 
 - 04/14/2025 [BitNet Official 2B Parameter Model on Hugging Face](https://huggingface.co/microsoft/BitNet-b1.58-2B-4T)
@@ -16,14 +24,6 @@ tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 - 03/21/2024 [The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ](https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf)
 - 02/27/2024 [The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits](https://arxiv.org/abs/2402.17764)
 - 10/17/2023 [BitNet: Scaling 1-bit Transformers for Large Language Models](https://arxiv.org/abs/2310.11453)
-
-# Setup
-
-```bash
-chmod +x setup.sh
-./setup.sh
-source venv/bin/activate
-```
 
 # Notes
 
@@ -38,6 +38,7 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
     - Uses squared ReLU [(ReLU²)](https://paperswithcode.com/method/squared-relu) activation in FFN layers
     - Employs [Sub-LayerNorm](https://proceedings.mlr.press/v202/wang23u.html) normalization
     - No bias terms in linear or normalization layers
+      - Binarization is a form of regularization. By reducing precision, the model generalizes better
 - Tokenizer: LLaMA 3 Tokenizer (vocab size: 128,256)
 - STE: Straight-through-Estimator to approximate gradients for non-differentiable functions like clip()
 
@@ -418,7 +419,8 @@ model.norm.weight                               torch.Size([2560])         2560 
 
 # Todo
 - Correct BitNet
-  - Use llama 3
+  - Use llama 3 
+  - Load hf weights into model
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
@@ -427,4 +429,5 @@ model.norm.weight                               torch.Size([2560])         2560 
 - Make new hardware for it (fpga)
   - https://github.com/rejunity/tiny-asic-1_58bit-matrix-mul
   - https://www.xilinx.com/publications/presentations/binary-networks-on-fpgas-sjsu-bnn-dec-2016.pdf
+  - https://jaewoong.org/pubs/fpt16-accelerating-bnn.pdf
 - Make 1-bit Mixture-of-Experts (MoE)
