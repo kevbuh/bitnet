@@ -1,9 +1,9 @@
 # bitnet
 
 ```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM with 2.4B parameters trained on four trillion tokens. 
-- **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
+<!-- - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
-- **Scalable**: Follows similar scaling laws to full-precision Transformers.
+- **Scalable**: Follows similar scaling laws to full-precision Transformers. -->
 
 tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 
@@ -41,6 +41,8 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
       - Binarization is a form of regularization. By reducing precision, the model generalizes better
 - Tokenizer: LLaMA 3 Tokenizer (vocab size: 128,256)
 - STE: Straight-through-Estimator to approximate gradients for non-differentiable functions like clip()
+- Quantization Function: It first scales the weight matrix by its average absolute value, and then rounds each value to the nearest integer among {-1, 0, +1}
+- Binarized LLMs training loss curve follow an S shape
 
 # Model Architecture
 
@@ -420,7 +422,15 @@ model.norm.weight                               torch.Size([2560])         2560 
 # Todo
 - Correct BitNet
   - Use llama 3 
-  - Load hf weights into model
+    - Like llama, bitnet uses RMSNorm, SwiGLU, rotary embedding, and removes all biases
+    - Replace all nn.Linear in attention and SwiGLU with BitLinear
+    - Remove RMSNorm before attention and SwiGLU because BitLinear has built-in RMSNorm
+  - learning rate scheduling
+    - 1.5e-3 to 8e-4, then 5e-4 to 0
+  - weight decay scheduling
+    - 0.1 for 50,000 steps, then 0
+- Official inference and training weights for 2.4B model
+  - Support for other LLaMa sizes to train
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
