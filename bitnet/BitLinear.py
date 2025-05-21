@@ -47,9 +47,11 @@ class BitLinear(nn.Module):
     Returns:
     y: an output tensor with shape [n, d]
     """
-    x_norm = self.norm(x)
+    # NOTE: the paper says not to use RMSNorm, but then contradicts it in the code
+    # x_norm = self.norm(x)
     # A trick for implementing Straight−Through−Estimator (STE) using detach()
-    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
+    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
+    x_quant = x
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y
