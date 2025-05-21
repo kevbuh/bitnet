@@ -1,4 +1,4 @@
-# from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
+# implementations from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
 import math
 import torch
 from torch import nn
@@ -25,18 +25,6 @@ def weight_quant(w):
   """
   scale = 1.0 / w.abs().mean().clamp_(min=1e-5)
   u = (w * scale).round().clamp_(-1, 1) / scale
-  return u
-
-def weight_quant_b1(w):
-  """ Per-tensor quantization to 1 bits. No grouping is needed for quantization.
-  Args:
-  w: a weight tensor with shape [d, k]
-  Returns:
-  u: a quantized weight with shape [d, k]
-  """
-  scale = w.abs().mean()
-  e = w.mean()
-  u = (w - e).sign() * scale
   return u
     
 class BitLinear(nn.Module):
