@@ -1,3 +1,6 @@
+import os
+import glob
+import torch
 import time
 
 def print_model_params(m):
@@ -38,6 +41,47 @@ def calculate_model_size_in_gb(model):
   total_size_gb = total_size_bytes / (1024 ** 3)
   print(f"Model size: {total_size_gb:.2f} GB")
   return total_size_gb 
+
+# Function to save model checkpoint
+def save_checkpoint(model, optimizer, epoch, loss, checkpoint_dir='checkpoints'):
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pt')
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }, checkpoint_path)
+    print(f"Checkpoint saved: {checkpoint_path}")
+
+# Function to load the latest checkpoint
+def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, 'checkpoint_epoch_*.pt'))
+    if not checkpoint_files:
+        print("No checkpoints found.")
+        return 0, float('inf')
+    latest_checkpoint = max(checkpoint_files, key=os.path.getctime)
+    checkpoint = torch.load(latest_checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+    print(f"Loaded checkpoint '{latest_checkpoint}' (epoch {epoch}, loss {loss:.4f})")
+    return epoch, loss
+
+def validate(model, val_loader, device):
+    model.eval()
+    total_loss = 0
+    with torch.no_grad():
+        i = 0
+        for xb, yb in val_loader:
+            i += 1
+            if i > 20: break
+            xb, yb = xb.to(device), yb.to(device)
+            logits, loss = model(xb, yb)
+            total_loss += loss.item() * xb.size(0)
+    avg_loss = total_loss / i
+    return avg_loss
 
 # MODEL_PARAMS = {
 #   '700M': dict(hidden_size=1536, glu_size=4096, n_heads=24, n_layers=24, lr_start=1.5*10e-3, lr_end=1*10e-3),

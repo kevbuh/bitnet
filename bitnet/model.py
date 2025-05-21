@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from BitLinear import BitLinear
+import math
 from utils import timeit
+from BitLinear import BitLinear
 
 class RotaryMHA(nn.Module):
   def __init__(self, d_model, n_head, n_kv_head):
@@ -11,6 +12,10 @@ class RotaryMHA(nn.Module):
     self.n_head = n_head
     self.n_kv   = n_kv_head
     self.head_dim = d_model // n_head
+
+    inv_freq = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2) / self.head_dim))
+    self.register_buffer("inv_freq", inv_freq)
+
     self.q_proj = BitLinear(d_model, d_model, bias=False)               # 2560×2560
     self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
     self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
@@ -26,7 +31,17 @@ class RotaryMHA(nn.Module):
     k = k.repeat_interleave(self.n_head // self.n_kv, dim=2)
     v = v.repeat_interleave(self.n_head // self.n_kv, dim=2)
 
-    # rotary-pos-enc here if you like …
+    # ── RoPE ──────────────────────────────────────────────
+    seq = torch.arange(T, device=x.device)
+    freqs = torch.einsum("t , d -> t d", seq, self.inv_freq)            # T × (d/2)
+    cos, sin = freqs.cos()[None, :, None, :], freqs.sin()[None, :, None, :]
+
+    def rope(t):
+      t1, t2 = t[..., ::2], t[..., 1::2]
+      return torch.cat([t1 * cos - t2 * sin, t1 * sin + t2 * cos], dim=-1)
+
+    q, k = rope(q), rope(k)
+    # ─────────────────────────────────────────────────────
 
     q = q.permute(0, 2, 1, 3)    # B, 32, T, 80
     k = k.permute(0, 2, 1, 3)    # B,  8, T, 80  (then repeat_interleave)
@@ -91,7 +106,6 @@ class GPTLanguageModel(nn.Module):
     super().__init__()
     self.block_size = block_size
     self.embed_tokens = nn.Embedding(vocab_size, d_model)
-    self.pos_embed    = nn.Parameter(torch.zeros(block_size, d_model))  # learned rope alt.
     self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
     self.ln_f         = SubLayerNorm(d_model)
     self.lm_head      = BitLinear(d_model, vocab_size, bias=False)
@@ -104,7 +118,7 @@ class GPTLanguageModel(nn.Module):
     elif isinstance(module, nn.Embedding): torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
   def forward(self, idx, targets=None):
-    x = self.embed_tokens(idx) + self.pos_embed[:idx.size(1)]
+    x = self.embed_tokens(idx)
     for layer in self.layers:
       x = layer(x)
     x = self.ln_f(x)
