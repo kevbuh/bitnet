@@ -1,0 +1,19 @@
+- Like llama, bitnet uses RMSNorm, SwiGLU, rotary embedding, and removes all biases
+- Replace all nn.Linear in attention and SwiGLU with BitLinear
+- Remove RMSNorm before attention and SwiGLU because BitLinear has built-in RMSNorm
+- learning rate scheduling
+    - 1.5e-3 to 8e-4, then 5e-4 to 0
+- weight decay scheduling
+    - 0.1 for 50,000 steps, then 0
+
+
+    
+- RoPE applied to q & k tensors before the dot-product
+- Sub-LayerNorm (SubLN)	Mean-&-variance normalisation, no bias term (γ optional)
+- Tokenizer & vocab	LLaMA-3 (128 k)
+- K-V sharing (GQA)	n_kv < n_head, replicate keys/values
+- ReLU² FFN
+- Norm placement: Pre-norm inside each branch (SubLN→Op→residual)
+- Biases: No biases anywhere (projections, FFN, norms)
+- BitLinear scale buffer	α (abs-mean) is non-trainable and must freeze after first forward
+- Activation quantisation (A8)	Per-token absmax → int8 inside every BitLinear forward

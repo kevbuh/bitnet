@@ -429,8 +429,10 @@ model.norm.weight                               torch.Size([2560])         2560 
     - 1.5e-3 to 8e-4, then 5e-4 to 0
   - weight decay scheduling
     - 0.1 for 50,000 steps, then 0
+- Add ons
+  - RoPE scaling for >4 k context
 - Official inference and training weights for 2.4B model
-  - Support for other LLaMa sizes to train
+  - Support for [other](https://huggingface.co/1bitLLM) LLaMa sizes to train
 - Binary kernels (triton?):
   - ternary weight matrix–vector product into two binary matmuls plus a subtraction
   - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
@@ -441,3 +443,4 @@ model.norm.weight                               torch.Size([2560])         2560 
   - https://www.xilinx.com/publications/presentations/binary-networks-on-fpgas-sjsu-bnn-dec-2016.pdf
   - https://jaewoong.org/pubs/fpt16-accelerating-bnn.pdf
 - Make 1-bit Mixture-of-Experts (MoE)
+- bitnet.c
