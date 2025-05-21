@@ -1,8 +1,9 @@
+# from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
+import math
+import torch
 from torch import nn
 from torch.nn import RMSNorm
 import torch.nn.functional as F
-import torch
-import math
 
 def activation_quant(x):
   """ Per-token quantization to 8 bits. No grouping is needed for quantization.
@@ -42,22 +43,14 @@ class BitLinear(nn.Module):
   """
   This is only for training, and kernel optimization is needed for efficiency.
   """
-  def __init__(self, in_features, out_features, bias=True, quant_type='b1.58'):
+  def __init__(self, in_features, out_features, bias=False):
     super().__init__()
     self.in_features = in_features
     self.out_features = out_features
     self.weight = nn.Parameter(torch.empty((out_features, in_features)))
     self.bias = nn.Parameter(torch.empty(out_features)) if bias else None
     self.norm = RMSNorm(in_features)
-    self.quant_type = quant_type
-    self.reset_parameters()
-      
-  def reset_parameters(self):
     nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-    if self.bias is not None:
-      fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
-      bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
-      nn.init.uniform_(self.bias, -bound, bound)
       
   def forward(self, x):
     """
@@ -67,11 +60,8 @@ class BitLinear(nn.Module):
     y: an output tensor with shape [n, d]
     """
     x_norm = self.norm(x)
-    w = self.weight # a weight tensor with shape [d, k]
-    if not self.training: return F.linear(x_norm, w, self.bias) 
     # A trick for implementing Straight−Through−Estimator (STE) using detach()
     x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
-    if self.quant_type == 'b1.58': w_quant = w + (weight_quant(w) - w).detach()
-    elif self.quant_type == 'b1': w_quant = w + (weight_quant_b1(w) - w).detach()
-    else: raise ValueError(f"Invalid quantization type: {self.quant_type}")
-    return F.linear(x_quant, w_quant, self.bias)
+    w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
+    y = F.linear(x_quant, w_quant)
+    return y
