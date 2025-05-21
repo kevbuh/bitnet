@@ -77,7 +77,7 @@ class SubLayerNorm(nn.Module):
     self.eps = eps
     if elementwise_affine:
       self.gamma = nn.Parameter(torch.ones(dim))
-      self.beta  = nn.Parameter(torch.zeros(dim))
+      self.register_parameter("beta", None) # bitnet spec says no bias term
     else:
       self.register_parameter('gamma', None)
       self.register_parameter('beta',  None)
@@ -86,7 +86,7 @@ class SubLayerNorm(nn.Module):
     mean = x.mean(-1, keepdim=True) # Compute mean over last dimension
     var = (x - mean).pow(2).mean(-1, keepdim=True) # Compute variance over last dimension
     x_norm = (x - mean) / torch.sqrt(var + self.eps) # Normalize: zero-mean, unit-variance
-    if self.gamma is not None: x_norm = x_norm * self.gamma + self.beta # Apply affine if present
+    if self.gamma is not None: x_norm = x_norm * self.gamma # scale
     return x_norm
     
 class Block(nn.Module):
