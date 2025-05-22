@@ -1,22 +1,24 @@
 import os
 import glob
-import torch
 import time
+import torch
+from functools import wraps
 
 def print_model_params(m):
   num_params = sum(p.numel() for p in m.parameters())
   if num_params >= 1e9: print(num_params / 1e9, 'B parameters')
   else: print(num_params / 1e6, 'M parameters')
 
-def timeit():
+def timeit(enabled: bool = True):
   """Decorator factory to time a function's execution."""
   def decorator(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
-      start_time = time.time()
+      if not enabled or not __debug__: return func(*args, **kwargs)
+      start = time.perf_counter()
       result = func(*args, **kwargs)
-      end_time = time.time()
-      step_time = end_time - start_time
-      print(f"TIMEIT: {step_time:.4f} seconds")
+      elapsed = time.perf_counter() - start
+      print(f"[timeit] {func.__qualname__} → {elapsed:.4f}s")
       return result
     return wrapper
   return decorator
