@@ -1,6 +1,6 @@
 # bitnet
 
-```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM (ternary‐weight STE, per‐token 8-bit abs-max activation, SubLN, SwiGLU, RoPE / GQA attention, no biases) with 2.4B parameters trained on four trillion tokens. 
+```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM (ternary‐weight STE, per‐token 8-bit abs-max activation, SubLN, ReLU² FFN, RoPE / GQA attention, no biases) with 2.4B parameters trained on four trillion tokens. 
 <!-- - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers. -->
@@ -35,7 +35,7 @@ Notes from [HF model card](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T)
 - Model: Based off of LLaMa
     - Modified with BitLinear layers
     - Uses Rotary Position Embeddings [(RoPE)](https://arxiv.org/abs/2104.09864).
-    <!-- - Uses squared ReLU [(ReLU²)](https://paperswithcode.com/method/squared-relu) activation in FFN layers -->
+    - Uses squared ReLU [(ReLU²)](https://paperswithcode.com/method/squared-relu) activation in FFN layers
     - Employs [Sub-LayerNorm](https://proceedings.mlr.press/v202/wang23u.html) normalization
     - No bias terms in linear or normalization layers
       - Binarization is a form of regularization. By reducing precision, the model generalizes better

@@ -105,36 +105,36 @@ class RotaryMHA(nn.Module):
     out   = (attn @ v).transpose(1, 2).reshape(B, T, -1)       # back to B, T, 2560
     return self.o_proj(out)
 
-# class ReLUSq(nn.Module):
-#   def forward(self, x):
-#     return F.relu(x) ** 2
+class ReLUSq(nn.Module):
+  def forward(self, x):
+    return F.relu(x) ** 2
 
-# class ReLUSqFFN(nn.Module):
-#   def __init__(self, d_model, hidden_dim):
-#     super().__init__()
-#     self.fc1 = BitLinear(d_model, hidden_dim)
-#     self.act = ReLUSq()
-#     self.fc2 = BitLinear(hidden_dim, d_model)
-
-#   def forward(self, x):
-#     x = self.fc1(x)
-#     x = self.act(x)
-#     x = self.fc2(x)
-#     return x
-
-class SwiGLUFFN(nn.Module):
-  def __init__(self, d_model, ffn_dim):
+class ReLUSqFFN(nn.Module):
+  def __init__(self, d_model, hidden_dim):
     super().__init__()
-    # project to 2*ffn_dim so we can gate half by the other half
-    self.fc1 = BitLinear(d_model, ffn_dim * 2)
-    self.fc2 = BitLinear(ffn_dim, d_model)
+    self.fc1 = BitLinear(d_model, hidden_dim)
+    self.act = ReLUSq()
+    self.fc2 = BitLinear(hidden_dim, d_model)
 
   def forward(self, x):
-    # x → [B, T, 2*ffn_dim]
-    x_proj = self.fc1(x)
-    a, b = x_proj.chunk(2, dim=-1)          # each [B, T, ffn_dim]
-    gated = F.silu(a) * b                   # SwiGLU: a * SiLU(b)
-    return self.fc2(gated)                  # back to [B, T, d_model]
+    x = self.fc1(x)
+    x = self.act(x)
+    x = self.fc2(x)
+    return x
+
+# class SwiGLUFFN(nn.Module):
+#   def __init__(self, d_model, ffn_dim):
+#     super().__init__()
+#     # project to 2*ffn_dim so we can gate half by the other half
+#     self.fc1 = BitLinear(d_model, ffn_dim * 2)
+#     self.fc2 = BitLinear(ffn_dim, d_model)
+
+#   def forward(self, x):
+#     # x → [B, T, 2*ffn_dim]
+#     x_proj = self.fc1(x)
+#     a, b = x_proj.chunk(2, dim=-1)          # each [B, T, ffn_dim]
+#     gated = F.silu(a) * b                   # SwiGLU: a * SiLU(b)
+#     return self.fc2(gated)                  # back to [B, T, d_model]
 
 class SubLayerNorm(nn.Module):
   def __init__(self, dim, eps=1e-6):
@@ -155,7 +155,8 @@ class Block(nn.Module):
     self.input_ln   = SubLayerNorm(n_embd)
     self.attn       = RotaryMHA(n_embd, n_head, n_kv_head, block_size)
     self.post_ln    = SubLayerNorm(n_embd)
-    self.mlp        = SwiGLUFFN(n_embd, ffn_dim)
+    self.mlp        = ReLUSqFFN(n_embd, ffn_dim)
+    
   def forward(self, x):
     x = x + self.attn(self.input_ln(x))
     x = x + self.mlp(self.post_ln(x))
