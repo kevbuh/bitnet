@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from utils import print_model_params, training_step, print_weights, calculate_model_size_in_gb, save_checkpoint, load_latest_checkpoint, validate
-from model import GPTLanguageModel
+from model import BitNet
 
 DEBUG = True
 
@@ -70,7 +70,7 @@ def train():
     val_loader = DataLoader(val_ds, batch_size=batch_size)
     train_iter = iter(train_loader)
     # ─────────────────────────────────────────────────────
-    model = GPTLanguageModel(vocab_size=vocab_size, d_model=n_embd, block_size=block_size, n_layer=n_layer, n_head=n_head, n_kv_head=n_kv_head, ffn_dim=ffn_dim).to(device).bfloat16()
+    model = BitNet(vocab_size=vocab_size, d_model=n_embd, block_size=block_size, n_layer=n_layer, n_head=n_head, n_kv_head=n_kv_head, ffn_dim=ffn_dim).to(device).bfloat16()
     if torch.cuda.is_available():
         model = torch.compile(model)
         training_step_fn = torch.compile(training_step)

@@ -7,7 +7,7 @@ from utils import timeit
 from BitLinear import BitLinear
 
 class RotaryMHA(nn.Module):
-  def __init__(self, d_model, n_head, n_kv_head):
+  def __init__(self, d_model, n_head, n_kv_head, block_size):
     super().__init__()
     self.n_head = n_head
     self.n_kv   = n_kv_head
@@ -15,6 +15,10 @@ class RotaryMHA(nn.Module):
 
     inv_freq = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2) / self.head_dim))
     self.register_buffer("inv_freq", inv_freq)
+
+    # precompute 1×1×block_size×block_size causal mask once
+    mask = torch.tril(torch.ones(block_size, block_size, dtype=torch.bool))
+    self.register_buffer("causal_mask", mask.unsqueeze(0).unsqueeze(1))
 
     self.q_proj = BitLinear(d_model, d_model)               # 2560×2560
     self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
@@ -48,7 +52,8 @@ class RotaryMHA(nn.Module):
     v = v.permute(0, 2, 1, 3)
 
     attn = (q @ k.transpose(-2, -1)) * self.head_dim ** -0.5   # B, 32, T, T
-    mask  = torch.tril(torch.ones(T, T, device=x.device, dtype=torch.bool)).unsqueeze(0).unsqueeze(1)
+    # grab the top-left T×T of our prebuilt mask
+    mask = self.causal_mask[:, :, :T, :T]
     attn  = attn.masked_fill(~mask, float('-inf'))
     attn  = attn.softmax(-1)
     out   = (attn @ v).transpose(1, 2).reshape(B, T, -1)       # back to B, T, 2560
@@ -85,10 +90,10 @@ class SubLayerNorm(nn.Module):
     return x_norm
     
 class Block(nn.Module):
-  def __init__(self, n_embd, n_head, n_kv_head, ffn_dim):
+  def __init__(self, n_embd, n_head, n_kv_head, ffn_dim, block_size):
     super().__init__()
     self.input_ln   = SubLayerNorm(n_embd)
-    self.attn       = RotaryMHA(n_embd, n_head, n_kv_head)
+    self.attn       = RotaryMHA(n_embd, n_head, n_kv_head, block_size)
     self.post_ln    = SubLayerNorm(n_embd)
     self.mlp        = ReLUSqFFN(n_embd, ffn_dim)
   def forward(self, x):
@@ -96,12 +101,12 @@ class Block(nn.Module):
     x = x + self.mlp(self.post_ln(x))
     return x
 
-class GPTLanguageModel(nn.Module):
+class BitNet(nn.Module):
   def __init__(self, vocab_size, d_model, block_size, n_layer, n_head, n_kv_head, ffn_dim):
     super().__init__()
     self.block_size = block_size
     self.embed_tokens = nn.Embedding(vocab_size, d_model)
-    self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
+    self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim, block_size) for _ in range(n_layer)])
     self.ln_f         = SubLayerNorm(d_model)
     self.lm_head      = BitLinear(d_model, vocab_size)
     self.apply(self._init_weights)
