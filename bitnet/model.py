@@ -42,10 +42,10 @@ class BitLinear(nn.Module):
     Args: x: an input tensor with shape [n, d]
     Returns: y: an output tensor with shape [n, d]
     """
-    # NOTE: the paper says not to use RMSNorm, but then contradicts it in their code. comment out for now. 
-    # x_norm = self.norm(x)
-    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
-    x_quant = x
+    # NOTE: the paper says not to use RMSNorm, but then contradicts it in their code. use for now?
+    # x_quant = x
+    x_norm = self.norm(x)
+    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y
@@ -156,7 +156,7 @@ class Block(nn.Module):
     self.attn       = RotaryMHA(n_embd, n_head, n_kv_head, block_size)
     self.post_ln    = SubLayerNorm(n_embd)
     self.mlp        = ReLUSqFFN(n_embd, ffn_dim)
-    
+
   def forward(self, x):
     x = x + self.attn(self.input_ln(x))
     x = x + self.mlp(self.post_ln(x))
