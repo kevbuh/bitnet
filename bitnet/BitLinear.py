@@ -31,12 +31,11 @@ class BitLinear(nn.Module):
   """
   This is only for training, and kernel optimization is needed for efficiency.
   """
-  def __init__(self, in_features, out_features, bias=False):
+  def __init__(self, in_features, out_features):
     super().__init__()
     self.in_features = in_features
     self.out_features = out_features
     self.weight = nn.Parameter(torch.empty((out_features, in_features)))
-    self.bias = nn.Parameter(torch.empty(out_features)) if bias else None
     self.norm = RMSNorm(in_features)
     nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
       
@@ -48,10 +47,10 @@ class BitLinear(nn.Module):
     y: an output tensor with shape [n, d]
     """
     # NOTE: the paper says not to use RMSNorm, but then contradicts it in the code
-    # x_norm = self.norm(x)
+    x_norm = self.norm(x)
     # A trick for implementing Straight−Through−Estimator (STE) using detach()
-    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
-    x_quant = x
+    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
+    # x_quant = x
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y

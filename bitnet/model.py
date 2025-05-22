@@ -16,10 +16,10 @@ class RotaryMHA(nn.Module):
     inv_freq = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2) / self.head_dim))
     self.register_buffer("inv_freq", inv_freq)
 
-    self.q_proj = BitLinear(d_model, d_model, bias=False)               # 2560×2560
-    self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
-    self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head, False)  # 2560×640
-    self.o_proj = BitLinear(d_model, d_model, bias=False)               # 2560×2560
+    self.q_proj = BitLinear(d_model, d_model)               # 2560×2560
+    self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
+    self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
+    self.o_proj = BitLinear(d_model, d_model)               # 2560×2560
 
   def forward(self, x):
     B, T, _ = x.shape
@@ -61,9 +61,9 @@ class ReLUSq(nn.Module):
 class ReLUSqFFN(nn.Module):
   def __init__(self, d_model, hidden_dim):
     super().__init__()
-    self.fc1 = BitLinear(d_model, hidden_dim, bias=False)
+    self.fc1 = BitLinear(d_model, hidden_dim)
     self.act = ReLUSq()
-    self.fc2 = BitLinear(hidden_dim, d_model, bias=False)
+    self.fc2 = BitLinear(hidden_dim, d_model)
 
   def forward(self, x):
     x = self.fc1(x)
@@ -72,21 +72,16 @@ class ReLUSqFFN(nn.Module):
     return x
 
 class SubLayerNorm(nn.Module):
-  def __init__(self, dim, eps=1e-6, elementwise_affine=True):
+  def __init__(self, dim, eps=1e-6):
     super().__init__()
     self.eps = eps
-    if elementwise_affine:
-      self.gamma = nn.Parameter(torch.ones(dim))
-      self.register_parameter("beta", None) # bitnet spec says no bias term
-    else:
-      self.register_parameter('gamma', None)
-      self.register_parameter('beta',  None)
+    self.gamma = nn.Parameter(torch.ones(dim))
 
   def forward(self, x):
     mean = x.mean(-1, keepdim=True) # Compute mean over last dimension
-    var = (x - mean).pow(2).mean(-1, keepdim=True) # Compute variance over last dimension
-    x_norm = (x - mean) / torch.sqrt(var + self.eps) # Normalize: zero-mean, unit-variance
-    if self.gamma is not None: x_norm = x_norm * self.gamma # scale
+    # var = (x - mean).pow(2).mean(-1, keepdim=True) # Compute variance over last dimension
+    # x_norm = (x - mean) / torch.sqrt(var + self.eps) # Normalize: zero-mean, unit-variance
+    x_norm = (x-mean) * self.gamma # scale
     return x_norm
     
 class Block(nn.Module):
@@ -108,13 +103,12 @@ class GPTLanguageModel(nn.Module):
     self.embed_tokens = nn.Embedding(vocab_size, d_model)
     self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim) for _ in range(n_layer)])
     self.ln_f         = SubLayerNorm(d_model)
-    self.lm_head      = BitLinear(d_model, vocab_size, bias=False)
+    self.lm_head      = BitLinear(d_model, vocab_size)
     self.apply(self._init_weights)
 
   def _init_weights(self, module):
     if isinstance(module, BitLinear):
       torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-      if module.bias is not None: torch.nn.init.zeros_(module.bias)
     elif isinstance(module, nn.Embedding): torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
   def forward(self, idx, targets=None):
