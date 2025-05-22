@@ -1,6 +1,6 @@
 # bitnet
 
-```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM with 2.4B parameters trained on four trillion tokens. 
+```bitnet``` is based on Microsoft's [BitNet b1.58 2B4T](https://huggingface.co/microsoft/bitnet-b1.58-2B-4T), a binarized LLaMa3-style LLM (ternary‐weight STE, per‐token 8-bit abs-max activation, SubLN, ReLU² FFN, RoPE / GQA attention, no biases) with 2.4B parameters trained on four trillion tokens. 
 <!-- - **BitLinear**: Drop-in replacement for `nn.Linear` with trainable 1-bit weights.
 - **Efficient**: 1-bit weights + activations = low memory + energy use.
 - **Scalable**: Follows similar scaling laws to full-precision Transformers. -->

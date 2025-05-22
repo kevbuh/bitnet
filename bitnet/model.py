@@ -42,11 +42,10 @@ class BitLinear(nn.Module):
     Args: x: an input tensor with shape [n, d]
     Returns: y: an output tensor with shape [n, d]
     """
-    # NOTE: the paper says not to use RMSNorm, but then contradicts it in the code
-    x_norm = self.norm(x)
-    # A trick for implementing Straight−Through−Estimator (STE) using detach()
-    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach()
-    # x_quant = x
+    # NOTE: the paper says not to use RMSNorm, but then contradicts it in their code. comment out for now. 
+    # x_norm = self.norm(x)
+    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
+    x_quant = x
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y
@@ -156,22 +155,14 @@ class BitNet(nn.Module):
     self.layers       = nn.ModuleList([Block(d_model, n_head, n_kv_head, ffn_dim, block_size) for _ in range(n_layer)])
     self.ln_f         = SubLayerNorm(d_model)
     self.lm_head      = BitLinear(d_model, vocab_size)
-    self.apply(self._init_weights)
-
-  def _init_weights(self, module):
-    if isinstance(module, BitLinear):
-      torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-    elif isinstance(module, nn.Embedding): torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
   def forward(self, idx, targets=None):
     x = self.embed_tokens(idx)
-    for layer in self.layers:
-      x = layer(x)
+    for layer in self.layers: x = layer(x)
     x = self.ln_f(x)
     logits = self.lm_head(x) # (B,T,vocab_size)
 
-    if targets is None:
-      loss = None
+    if targets is None: loss = None
     else:
       B, T, C = logits.shape
       logits = logits.view(B*T, C)
