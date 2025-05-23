@@ -5,7 +5,7 @@ from torch.nn import functional as F
 import math
 from utils import timeit
 
-# ---- bitlinear implementations from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
+# ---- quant implementations from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
 
 def activation_quant(x):
   """ Per-token quantization to 8 bits. No grouping is needed for quantization.

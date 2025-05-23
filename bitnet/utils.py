@@ -44,21 +44,9 @@ def calculate_model_size_in_gb(model):
   print(f"Model size: {total_size_gb:.2f} GB")
   return total_size_gb 
 
-# Function to save model checkpoint
-def save_checkpoint(model, optimizer, epoch, loss, checkpoint_dir='checkpoints'):
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pt')
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'loss': loss,
-    }, checkpoint_path)
-    print(f"Checkpoint saved: {checkpoint_path}")
-
 # Function to load the latest checkpoint
 def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
-    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, 'checkpoint_epoch_*.pt'))
+    checkpoint_files = glob.glob(os.path.join(checkpoint_dir, 'checkpoint_*.pt'))
     if not checkpoint_files:
         print("No checkpoints found.")
         return 0, float('inf')
@@ -70,6 +58,19 @@ def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
     loss = checkpoint['loss']
     print(f"Loaded checkpoint '{latest_checkpoint}' (epoch {epoch}, loss {loss:.4f})")
     return epoch, loss
+
+# Function to save model checkpoint
+def save_checkpoint(model, optimizer, it, val_loss, checkpoint_dir='checkpoints'):
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_{it}.pt')
+    torch.save({
+        # 'epoch': epoch,
+        'it': it,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'val_loss': val_loss,
+    }, checkpoint_path)
+    print(f"Checkpoint saved: {checkpoint_path}")
 
 def validate(model, val_loader, device):
     model.eval()
