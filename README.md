@@ -420,13 +420,11 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
-- Correct BitNet
-  - learning rate scheduling
-    - 1.5e-3 to 8e-4, then 5e-4 to 0
-  - weight decay scheduling
-    - 0.1 for 50,000 steps, then 0
-- Add ons
-  - RoPE scaling for >4 k context
+- test inputs against inference weights
+- learning rate scheduling
+  - 1.5e-3 to 8e-4, then 5e-4 to 0
+- weight decay scheduling
+  - 0.1 for 50,000 steps, then 0
 - Official inference and training weights for 2.4B model
   - Support for [other](https://huggingface.co/1bitLLM) LLaMa sizes to train
 - Binary kernels (triton?):

@@ -77,19 +77,17 @@ def save_checkpoint(model, optimizer, it, val_loss, checkpoint_dir='checkpoints'
     print(f"Checkpoint saved: {checkpoint_path}")
 
 def validate(model, val_loader, device):
-    model.eval()
-    total_loss = 0
-    with torch.no_grad():
-        i = 0
-        for xb, yb in val_loader:
-            i += 1
-            if i > 20: break
-            xb, yb = xb.to(device), yb.to(device)
-            logits, loss = model(xb, yb)
-            total_loss += loss.item() * xb.size(0)
-    avg_loss = total_loss / i
-    model.train()
-    return avg_loss
+  total_loss = 0.0
+  total_tokens = 0
+  with torch.no_grad():
+      for xb, yb in val_loader:
+          xb, yb = xb.to(device), yb.to(device)
+          logits, loss = model(xb, yb)  # if this is mean-per-token…
+          num_tokens = xb.numel()       # B*T
+          total_loss  += loss.item() * num_tokens
+          total_tokens += num_tokens
+  avg_loss = total_loss / total_tokens
+  return avg_loss
 
 # MODEL_PARAMS = {
 #   '700M': dict(hidden_size=1536, glu_size=4096, n_heads=24, n_layers=24, lr_start=1.5*10e-3, lr_end=1*10e-3),

@@ -117,6 +117,7 @@ if __name__ == "__main__":
         val_text = "\n".join(wiki["validation"]["text"])
         train_data = torch.tensor(encode(train_text), dtype=torch.long)
         val_data   = torch.tensor(encode(val_text),   dtype=torch.long)
+        if args.debug: val_data = val_data[:len(val_data) // 100]
 
     train_ds = TokenDataset(train_data, cfg["block_size"])
     val_ds = TokenDataset(val_data, cfg["block_size"])
@@ -146,9 +147,12 @@ if __name__ == "__main__":
         xb, yb = xb.to(device), yb.to(device)
         if it % cfg["eval_interval"] == 0 or it == cfg["max_iters"] - 1:
             with torch.no_grad():
-                logits, loss = model(xb, yb)
+                val_length = len(val_loader.dataset)
+                train_length = len(train_loader.dataset)
+                print(f"Training set length: {train_length}")
+                print(f"Validation set length: {val_length}")
                 val_loss = validate(model, val_loader, device)
-                if args.debug: print(f"step {it}: train loss {loss:.4f}, val loss {val_loss:.4f}")
+                if args.debug: print(f"step {it}: val loss {val_loss:.4f}")
                 if val_loss < best_loss:
                     best_loss = val_loss
                     save_checkpoint(model, optimizer, it, val_loss)

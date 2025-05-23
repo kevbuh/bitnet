@@ -4,10 +4,7 @@
 - learning rate scheduling
     - 1.5e-3 to 8e-4, then 5e-4 to 0
 - weight decay scheduling
-    - 0.1 for 50,000 steps, then 0
-
-
-    
+    - 0.1 for 50,000 steps, then 0    
 - RoPE applied to q & k tensors before the dot-product
 - Sub-LayerNorm (SubLN)	Mean-&-variance normalisation, no bias term (γ optional)
 - Tokenizer & vocab	LLaMA-3 (128 k)
