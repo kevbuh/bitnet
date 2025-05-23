@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch.nn.functional import scaled_dot_product_attention
 
 # ---- quant implementations from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
 
@@ -96,12 +97,8 @@ class RotaryMHA(nn.Module):
     k = k.permute(0, 2, 1, 3)    # B,  8, T, 80  (then repeat_interleave)
     v = v.permute(0, 2, 1, 3)
 
-    attn = (q @ k.transpose(-2, -1)) * self.head_dim ** -0.5   # B, 32, T, T
-    # grab the top-left T×T of our prebuilt mask
-    mask = self.causal_mask[:, :, :T, :T]
-    attn  = attn.masked_fill(~mask, float('-inf'))
-    attn  = attn.softmax(-1)
-    out   = (attn @ v).transpose(1, 2).reshape(B, T, -1)       # back to B, T, 2560
+    out = scaled_dot_product_attention(q, k, v, attn_mask=None, is_causal=True, dropout_p=0.0)
+    out   = out.transpose(1, 2).reshape(B, T, -1)       # back to B, T, 2560
     return self.o_proj(out)
 
 class ReLUSq(nn.Module):
