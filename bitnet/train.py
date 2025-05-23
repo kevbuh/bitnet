@@ -13,8 +13,8 @@ from pathlib import Path
 from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
 
-from utils import print_model_params, training_step, calculate_model_size_in_gb, save_checkpoint, load_latest_checkpoint, validate
 from model import BitNet
+from utils import print_model_params, training_step, calculate_model_size_in_gb, save_checkpoint, load_latest_checkpoint, validate, get_tokenizer
 
 class CharDataset(Dataset):
     """Character-level language-model dataset that returns (x, y) tensors."""
@@ -31,13 +31,8 @@ class CharDataset(Dataset):
         y = chunk[1:]
         return x, y
 
-def build_vocab_and_data(text: str):
-    """Build (stoi, itos, encode) plus tensorised data from raw text."""
-    chars = sorted(set(text))
-    stoi = {ch: i for i, ch in enumerate(chars)}
-    itos = {i: ch for ch, i in stoi.items()}
-    encode = lambda s: [stoi[c] for c in s]
-    return stoi, itos, torch.tensor(encode(text), dtype=torch.long)
+tok = get_tokenizer()
+def encode(text: str): return tok.encode(text, add_special_tokens=False)
 
 def get_batch(loader_iter, loader):
     """Returns next (x, y) batch tensors, resetting iterator if exhausted."""
@@ -62,7 +57,6 @@ if __name__ == "__main__":
 
     torch.manual_seed(args.seed)
 
-    # Device
     device = "mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -77,7 +71,7 @@ if __name__ == "__main__":
             n_kv_head      = 2,       # 1/4th of 8
             ffn_dim        = 1024,    # 4× the embedding size
             n_layer        = 4,       # 1/7.5th of 30 (round to 4)
-            max_iters      = 1_000,   # enough to see loss descend
+            max_iters      = 500,     # enough to see loss descend
             eval_interval  = 100,     # check validation every 100 iters
         )
     else:
@@ -97,10 +91,9 @@ if __name__ == "__main__":
     # -------------------- Load data --------------------
     if args.dataset == "char":
         text_path = Path("data/input.txt")
-        if not text_path.exists():
-            raise FileNotFoundError("Expected `data/input.txt` for char dataset. Provide the file or use --dataset wiki")
+        if not text_path.exists(): raise FileNotFoundError("Expected `data/input.txt` for char dataset. Provide the file or use --dataset wiki")
         raw_text = text_path.read_text(encoding="utf-8")
-        stoi, itos, data = build_vocab_and_data(raw_text)
+        data = torch.tensor(encode(raw_text), dtype=torch.long)
         n = int(0.9 * len(data))
         train_data = data[:n]
         val_data = data[n:]
@@ -109,22 +102,20 @@ if __name__ == "__main__":
         wiki = load_dataset("wikitext", "wikitext-2-raw-v1")
         train_text = "\n".join(wiki["train"]["text"])
         val_text = "\n".join(wiki["validation"]["text"])
-        stoi, itos, _ = build_vocab_and_data(train_text + val_text)
-        encode = lambda s: [stoi[c] for c in s]
         train_data = torch.tensor(encode(train_text), dtype=torch.long)
-        val_data = torch.tensor(encode(val_text), dtype=torch.long)
+        val_data   = torch.tensor(encode(val_text),   dtype=torch.long)
 
     train_ds = CharDataset(train_data, cfg["block_size"])
     val_ds = CharDataset(val_data, cfg["block_size"])
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, drop_last=True)
     
-    vocab_size = len(stoi)
+    vocab_size = tok.vocab_size
     print(f"Vocabulary size: {vocab_size}")
     print("----------------------------")
 
     # -------------------- Model --------------------
-    model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device)
+    model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device, dtype=torch.bfloat16)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"])
 
@@ -160,4 +151,4 @@ if __name__ == "__main__":
                     best_loss = val_loss
                     save_checkpoint(model, optimizer, it, val_loss)
         training_step(model, xb, yb, optimizer)
-    model.stream_output(cfg["block_size"], itos, device)
+    model.generate(cfg["block_size"], tok, device)

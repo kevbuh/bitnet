@@ -122,20 +122,6 @@ class ReLUSqFFN(nn.Module):
     x = self.fc2(x)
     return x
 
-# class SwiGLUFFN(nn.Module):
-#   def __init__(self, d_model, ffn_dim):
-#     super().__init__()
-#     # project to 2*ffn_dim so we can gate half by the other half
-#     self.fc1 = BitLinear(d_model, ffn_dim * 2)
-#     self.fc2 = BitLinear(ffn_dim, d_model)
-
-#   def forward(self, x):
-#     # x → [B, T, 2*ffn_dim]
-#     x_proj = self.fc1(x)
-#     a, b = x_proj.chunk(2, dim=-1)          # each [B, T, ffn_dim]
-#     gated = F.silu(a) * b                   # SwiGLU: a * SiLU(b)
-#     return self.fc2(gated)                  # back to [B, T, d_model]
-
 class SubLayerNorm(nn.Module):
   def __init__(self, dim, eps=1e-6):
     super().__init__()
@@ -185,21 +171,8 @@ class BitNet(nn.Module):
       targets = targets.view(B*T)
       loss = F.cross_entropy(logits, targets)
     return logits, loss
-
-  @timeit()
-  def generate(self, idx, max_new_tokens):
-    # idx is (B, T) array of indices in the current context
-    for _ in range(max_new_tokens):
-      idx_cond = idx[:, -self.block_size:] # crop idx to the last block_size tokens
-      logits, loss = self(idx_cond) # get the predictions
-      logits = logits[:, -1, :] # becomes (B, C), focus only on the last time step
-      probs = F.softmax(logits, dim=-1) # (B, C), apply softmax to get probabilities
-      idx_next = torch.multinomial(probs, num_samples=1) # (B, 1), sample from the distribution
-      idx = torch.cat((idx, idx_next), dim=1) # (B, T+1), append sampled index to the running sequence
-    return idx
   
-  @timeit()
-  def stream_output(self, max_new_tokens, itos, device):
+  def generate(self, max_new_tokens, tokenizer, device):
     self.eval()
     idx = torch.zeros((1, 1), device=device, dtype=torch.long) # initialize context
     print("decoding…", flush=True)
@@ -210,5 +183,5 @@ class BitNet(nn.Module):
       probs = F.softmax(logits, dim=-1) # (1, vocab_size)
       idx_next = torch.multinomial(probs, num_samples=1) # (1,1)
       idx = torch.cat([idx, idx_next], dim=1)
-      print(itos[idx_next.item()], end='', flush=True)
+      print(tokenizer.decode([idx_next.item()], skip_special_tokens=True), end='', flush=True)
     print()

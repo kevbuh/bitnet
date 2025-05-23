@@ -2,7 +2,11 @@ import os
 import glob
 import time
 import torch
-from functools import wraps
+from functools import wraps, lru_cache
+from transformers import AutoTokenizer
+
+@lru_cache(maxsize=1)
+def get_tokenizer(): return AutoTokenizer.from_pretrained("microsoft/bitnet-b1.58-2B-4T", use_fast=True, trust_remote_code=True)
 
 def print_model_params(m):
   num_params = sum(p.numel() for p in m.parameters())

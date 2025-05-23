@@ -421,10 +421,6 @@ model.norm.weight                               torch.Size([2560])         2560 
 
 # Todo
 - Correct BitNet
-  - Use llama 3 
-    - Like llama, bitnet uses RMSNorm, SwiGLU, rotary embedding, and removes all biases
-    - Replace all nn.Linear in attention and SwiGLU with BitLinear
-    - Remove RMSNorm before attention and SwiGLU because BitLinear has built-in RMSNorm
   - learning rate scheduling
     - 1.5e-3 to 8e-4, then 5e-4 to 0
   - weight decay scheduling
