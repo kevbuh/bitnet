@@ -88,6 +88,7 @@ def validate(model, val_loader, device):
             logits, loss = model(xb, yb)
             total_loss += loss.item() * xb.size(0)
     avg_loss = total_loss / i
+    model.train()
     return avg_loss
 
 # MODEL_PARAMS = {

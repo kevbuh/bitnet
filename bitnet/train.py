@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-$ python bitnet/train.py --dataset char --debug
+$ python bitnet/train.py --dataset custom --debug
 $ python bitnet/train.py --dataset wiki --epochs 5 --batch_size 8
 """
 
 import torch
-import math
 import argparse
 from tqdm import tqdm
 from typing import Tuple
@@ -45,7 +44,7 @@ def get_batch(loader_iter, loader):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", choices=["char", "wiki"], default="char")
+    parser.add_argument("--dataset", choices=["custom", "wiki"], default="custom")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--epochs", type=int, default=3, help="Only used for wiki dataset")  # noqa: E501
     parser.add_argument("--batch_size", type=int, default=None)
@@ -85,13 +84,12 @@ if __name__ == "__main__":
 
     print("----- Hyper-parameters -----")
     for k, v in cfg.items():
-        if k not in {"n_embd", "n_head", "n_kv_head", "ffn_dim", "n_layer"}:
-            print(f"  {k:>12}: {v}")
+        print(f"  {k:>13}: {v}")
 
     # -------------------- Load data --------------------
-    if args.dataset == "char":
+    if args.dataset == "custom":
         text_path = Path("data/input.txt")
-        if not text_path.exists(): raise FileNotFoundError("Expected `data/input.txt` for char dataset. Provide the file or use --dataset wiki")
+        if not text_path.exists(): raise FileNotFoundError("Expected `data/input.txt` for custom dataset. Provide the file or use --dataset wiki")
         raw_text = text_path.read_text(encoding="utf-8")
         data = torch.tensor(encode(raw_text), dtype=torch.long)
         n = int(0.9 * len(data))
@@ -116,7 +114,6 @@ if __name__ == "__main__":
 
     # -------------------- Model --------------------
     model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device, dtype=torch.bfloat16)
-
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"])
 
     # diagnostics
@@ -124,23 +121,14 @@ if __name__ == "__main__":
         print_model_params(model)
         calculate_model_size_in_gb(model)
 
-    # checkpoint
-    start_iter, best_loss = load_latest_checkpoint(model, optimizer)
-
-    # derive max_iters for wiki if not explicitly set
-    if cfg["max_iters"] is None:
-        steps_per_epoch = len(train_loader)
-        cfg["max_iters"] = args.epochs * steps_per_epoch
-        print(f"Computed max_iters = {cfg['max_iters']} (epochs={args.epochs}, steps/epoch={steps_per_epoch})")
-
     # -------------------- Training loop --------------------
+    best_loss = float('inf')
+    start_iter, best_loss = load_latest_checkpoint(model, optimizer)
     print(f"Training for {cfg['max_iters']} iterations…")
     train_iter = iter(train_loader)
-
     for it in tqdm(range(start_iter, cfg["max_iters"])):
         xb, yb, train_iter = get_batch(train_iter, train_loader)
         xb, yb = xb.to(device), yb.to(device)
-
         if it % cfg["eval_interval"] == 0 or it == cfg["max_iters"] - 1:
             with torch.no_grad():
                 logits, loss = model(xb, yb)
