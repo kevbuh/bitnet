@@ -41,9 +41,9 @@ class BitLinear(nn.Module):
     Returns: y: an output tensor with shape [n, d]
     """
     # NOTE: the paper says not to use normalization, but then contradicts it by using RMSNorm in their code. dont use for now?
-    x_quant = x
-    # x_norm = self.norm(x)
-    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
+    # x_quant = x
+    x_norm = self.norm(x)
+    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y

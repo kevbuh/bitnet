@@ -58,10 +58,10 @@ def load_latest_checkpoint(model, optimizer, checkpoint_dir='checkpoints'):
     checkpoint = torch.load(latest_checkpoint)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    epoch = checkpoint['epoch']
-    loss = checkpoint['loss']
-    print(f"Loaded checkpoint '{latest_checkpoint}' (epoch {epoch}, loss {loss:.4f})")
-    return epoch, loss
+    it = checkpoint['it']
+    val_loss = checkpoint['val_loss']
+    print(f"Loaded checkpoint '{latest_checkpoint}' (it {it}, val_loss {val_loss:.4f})")
+    return it, val_loss
 
 # Function to save model checkpoint
 def save_checkpoint(model, optimizer, it, val_loss, checkpoint_dir='checkpoints'):

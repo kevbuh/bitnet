@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # -------------------- Hyper-parameters --------------------
     if args.debug: # because im gpu poor
         cfg = dict(
-            batch_size     = 2,       # small so it fits in GPU memory
+            batch_size     = 4,       # small so it fits in GPU memory
             block_size     = 512,     # ¼ of the full context—but long enough to catch positional bugs
             lr             = 3e-4,    # a standard debug learning‐rate
             n_embd         = 256,     # 1/10th of 2560
