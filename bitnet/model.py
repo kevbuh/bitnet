@@ -69,6 +69,11 @@ class RotaryMHA(nn.Module):
     self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
     self.o_proj = BitLinear(d_model, d_model)                    # 2560×2560
 
+  @staticmethod
+  def rope(t, sin, cos):
+      t1, t2 = t[..., ::2], t[..., 1::2]
+      return torch.cat([t1 * cos - t2 * sin, t1 * sin + t2 * cos], dim=-1)
+
   def forward(self, x):
     B, T, _ = x.shape
     q = self.q_proj(x).view(B, T, self.n_head,  self.head_dim)  # B T 32 80
@@ -84,11 +89,7 @@ class RotaryMHA(nn.Module):
     freqs = torch.einsum("t , d -> t d", seq, self.inv_freq)     # T × (d/2)
     cos, sin = freqs.cos()[None, :, None, :], freqs.sin()[None, :, None, :]
 
-    def rope(t):
-      t1, t2 = t[..., ::2], t[..., 1::2]
-      return torch.cat([t1 * cos - t2 * sin, t1 * sin + t2 * cos], dim=-1)
-
-    q, k = rope(q), rope(k)
+    q, k = self.rope(q, cos, sin), self.rope(k, cos, sin)
     # ─────────────────────────────────────────────────────
 
     q = q.permute(0, 2, 1, 3)    # B, 32, T, 80

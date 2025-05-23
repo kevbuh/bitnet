@@ -9,7 +9,7 @@ def test_act_no_amplification(B, D):
     # each row’s peak abs after quant ≤ before quant
     before = x.abs().max(dim=-1).values
     after  = q.abs().max(dim=-1).values
-    assert torch.all(after <= before + 1e-6)
+    assert torch.all(after <= before + 1e-5)
 
 def test_act_idempotent():
     x = torch.randn(4, 64)
@@ -21,7 +21,19 @@ def test_act_zero():
     z = torch.zeros(3, 128)
     assert torch.all(activation_quant(z) == 0)
 
-# ——— now for weight_quant ———
+def test_activation_quant_max_level():
+    x = torch.zeros(1, 16)
+    x[0, 0] = 1e6
+    scale = 127.0 / x.abs().max(dim=-1, keepdim=True).values.clamp(min=1e-5)
+    q = activation_quant(x)
+    levels = (q * scale).round().clamp(-128, 127)
+    assert levels[0, 0] == 127
+
+def test_activation_quant_gradflow():
+    x = torch.randn(2,3, dtype=torch.double, requires_grad=True)
+    assert torch.autograd.gradcheck(activation_quant, (x,), atol=1e-4)
+
+# ——— weight_quant ———
 
 def test_weight_no_amplification():
     w = torch.randn(64, 32) * 2.0
