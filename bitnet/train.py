@@ -138,7 +138,6 @@ if __name__ == "__main__":
     train_iter = iter(train_loader)
 
     for it in tqdm(range(start_iter, cfg["max_iters"])):
-
         xb, yb, train_iter = get_batch(train_iter, train_loader)
         xb, yb = xb.to(device), yb.to(device)
 
@@ -146,7 +145,7 @@ if __name__ == "__main__":
             with torch.no_grad():
                 logits, loss = model(xb, yb)
                 val_loss = validate(model, val_loader, device)
-                print(f"step {it}: train loss {loss:.4f}, val loss {val_loss:.4f}")
+                if args.debug: print(f"step {it}: train loss {loss:.4f}, val loss {val_loss:.4f}")
                 if val_loss < best_loss:
                     best_loss = val_loss
                     save_checkpoint(model, optimizer, it, val_loss)

@@ -1,9 +1,7 @@
+import math
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
-import math
-from utils import timeit
 
 # ---- quant implementations from the paper: https://github.com/microsoft/unilm/blob/master/bitnet/The-Era-of-1-bit-LLMs__Training_Tips_Code_FAQ.pdf
 
@@ -42,10 +40,10 @@ class BitLinear(nn.Module):
     Args: x: an input tensor with shape [n, d]
     Returns: y: an output tensor with shape [n, d]
     """
-    # NOTE: the paper says not to use RMSNorm, but then contradicts it in their code. use for now?
-    # x_quant = x
-    x_norm = self.norm(x)
-    x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
+    # NOTE: the paper says not to use normalization, but then contradicts it by using RMSNorm in their code. dont use for now?
+    x_quant = x
+    # x_norm = self.norm(x)
+    # x_quant = x_norm + (activation_quant(x_norm) - x_norm).detach() # A trick for implementing Straight−Through−Estimator (STE) using detach()
     w_quant = self.weight + (weight_quant(self.weight) - self.weight).detach()
     y = F.linear(x_quant, w_quant)
     return y
@@ -66,10 +64,10 @@ class RotaryMHA(nn.Module):
     mask = torch.tril(torch.ones(block_size, block_size, dtype=torch.bool))
     self.register_buffer("causal_mask", mask.unsqueeze(0).unsqueeze(1))
 
-    self.q_proj = BitLinear(d_model, d_model)               # 2560×2560
+    self.q_proj = BitLinear(d_model, d_model)                    # 2560×2560
     self.k_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
     self.v_proj = BitLinear(d_model, self.head_dim * n_kv_head)  # 2560×640
-    self.o_proj = BitLinear(d_model, d_model)               # 2560×2560
+    self.o_proj = BitLinear(d_model, d_model)                    # 2560×2560
 
   def forward(self, x):
     B, T, _ = x.shape
@@ -83,7 +81,7 @@ class RotaryMHA(nn.Module):
 
     # ── RoPE ──────────────────────────────────────────────
     seq = torch.arange(T, device=x.device)
-    freqs = torch.einsum("t , d -> t d", seq, self.inv_freq)            # T × (d/2)
+    freqs = torch.einsum("t , d -> t d", seq, self.inv_freq)     # T × (d/2)
     cos, sin = freqs.cos()[None, :, None, :], freqs.sin()[None, :, None, :]
 
     def rope(t):
@@ -129,11 +127,7 @@ class SubLayerNorm(nn.Module):
     self.gamma = nn.Parameter(torch.ones(dim))
 
   def forward(self, x):
-    mean = x.mean(-1, keepdim=True) # Compute mean over last dimension
-    # var = (x - mean).pow(2).mean(-1, keepdim=True) # Compute variance over last dimension
-    # x_norm = (x - mean) / torch.sqrt(var + self.eps) # Normalize: zero-mean, unit-variance
-    x_norm = (x-mean) * self.gamma # scale
-    return x_norm
+    return (x-x.mean(-1, keepdim=True)) * self.gamma
     
 class Block(nn.Module):
   def __init__(self, n_embd, n_head, n_kv_head, ffn_dim, block_size):
