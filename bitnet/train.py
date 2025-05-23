@@ -85,11 +85,10 @@ if __name__ == "__main__":
             n_kv_head      = 2,       # 1/4th of 8
             ffn_dim        = 1024,    # 4× the embedding size
             n_layer        = 4,       # 1/7.5th of 30 (round to 4)
-            max_iters      = 500,     # enough to see loss descend
-            eval_interval  = 100,     # check validation every 100 iters
+            max_iters      = 5000,     # enough to see loss descend
+            eval_interval  = 1000,     # check validation every 100 iters
         )
-    else:
-        cfg = dict(batch_size=4, block_size=2048, lr=1.2e-2, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
+    else: cfg = dict(batch_size=4, block_size=2048, lr=1.2e-2, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
 
     # allow CLI overrides
     if args.batch_size is not None: cfg["batch_size"] = args.batch_size
@@ -98,8 +97,8 @@ if __name__ == "__main__":
     if args.max_iters is not None: cfg["max_iters"] = args.max_iters
 
     print("----- Hyper-parameters -----")
-    for k, v in cfg.items():
-        print(f"  {k:>13}: {v}")
+    for k, v in cfg.items(): print(f"  {k:>13}: {v}")
+    print("----------------------------")
 
     # -------------------- Load data --------------------
     if args.dataset == "custom":
@@ -107,7 +106,7 @@ if __name__ == "__main__":
         if not text_path.exists(): raise FileNotFoundError("Expected `data/input.txt` for custom dataset. Provide the file or use --dataset wiki")
         raw_text = text_path.read_text(encoding="utf-8")
         data = torch.tensor(encode(raw_text), dtype=torch.long)
-        n = int(0.9 * len(data))
+        n = int(0.995 * len(data))
         train_data = data[:n]
         val_data = data[n:]
     else: # wiki
@@ -117,7 +116,7 @@ if __name__ == "__main__":
         val_text = "\n".join(wiki["validation"]["text"])
         train_data = torch.tensor(encode(train_text), dtype=torch.long)
         val_data   = torch.tensor(encode(val_text),   dtype=torch.long)
-        if args.debug: val_data = val_data[:len(val_data) // 100]
+        if args.debug: val_data = val_data[:len(val_data) // 300]
 
     train_ds = TokenDataset(train_data, cfg["block_size"])
     val_ds = TokenDataset(val_data, cfg["block_size"])
@@ -126,9 +125,9 @@ if __name__ == "__main__":
     
     vocab_size = tok.vocab_size
     print(f"Vocabulary size: {vocab_size}")
-    print("----------------------------")
 
     # -------------------- Model --------------------
+
     model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device, dtype=torch.bfloat16)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"])
 
@@ -138,6 +137,7 @@ if __name__ == "__main__":
         calculate_model_size_in_gb(model)
 
     # -------------------- Training loop --------------------
+
     best_loss = float('inf')
     start_iter, best_loss = load_latest_checkpoint(model, optimizer)
     print(f"Training for {cfg['max_iters']} iterations…")
@@ -149,8 +149,9 @@ if __name__ == "__main__":
             with torch.no_grad():
                 val_length = len(val_loader.dataset)
                 train_length = len(train_loader.dataset)
-                print(f"Training set length: {train_length}")
-                print(f"Validation set length: {val_length}")
+                if it == 0: 
+                    print(f"Training set length: {train_length}")
+                    print(f"Validation set length: {val_length}")
                 val_loss = validate(model, val_loader, device)
                 if args.debug: print(f"step {it}: val loss {val_loss:.4f}")
                 if val_loss < best_loss:

@@ -27,7 +27,7 @@ def timeit(enabled: bool = True):
     return wrapper
   return decorator
 
-@timeit()
+# @timeit()
 def training_step(model, xb, yb, optimizer):
   # evaluate the loss
   logits, loss = model(xb, yb)
@@ -80,12 +80,12 @@ def validate(model, val_loader, device):
   total_loss = 0.0
   total_tokens = 0
   with torch.no_grad():
-      for xb, yb in val_loader:
-          xb, yb = xb.to(device), yb.to(device)
-          logits, loss = model(xb, yb)  # if this is mean-per-token…
-          num_tokens = xb.numel()       # B*T
-          total_loss  += loss.item() * num_tokens
-          total_tokens += num_tokens
+    for xb, yb in val_loader:
+      xb, yb = xb.to(device), yb.to(device)
+      logits, loss = model(xb, yb)
+      num_tokens = xb.numel()       # B*T
+      total_loss  += loss.item() * num_tokens
+      total_tokens += num_tokens
   avg_loss = total_loss / total_tokens
   return avg_loss
 
