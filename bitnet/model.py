@@ -144,7 +144,7 @@ class Block(nn.Module):
 
 class BitNet(nn.Module):
   def __init__(self, vocab_size, d_model, block_size, n_layer, n_head, n_kv_head, ffn_dim):
-    assert(n_head % n_kv_head == 0, "n_head must be divisible by n_kv_head")
+    if n_head % n_kv_head != 0: raise ValueError("n_head must be divisible by n_kv_head")
     super().__init__()
     self.block_size = block_size
     self.embed_tokens = nn.Embedding(vocab_size, d_model)
