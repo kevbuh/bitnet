@@ -11,6 +11,7 @@ from pathlib import Path
 from datasets import load_dataset
 from typing import Tuple, Union, List
 from torch.utils.data import Dataset, DataLoader
+from torch.optim.lr_scheduler import LinearLR, SequentialLR
 
 from model import BitNet
 from utils import print_model_params, training_step, calculate_model_size_in_gb, save_checkpoint, load_latest_checkpoint, validate, get_tokenizer
@@ -79,22 +80,23 @@ if __name__ == "__main__":
         cfg = dict(
             batch_size     = 4,       # small so it fits in GPU memory
             block_size     = 512,     # ¼ of the full context—but long enough to catch positional bugs
-            lr             = 3e-4,    # a standard debug learning‐rate
+            lr             = 1.5e-3,    # a standard debug learning‐rate
             n_embd         = 256,     # 1/10th of 2560
             n_head         = 8,       # 1/4th of 32; keeps head_dim = 256/8 = 32
             n_kv_head      = 2,       # 1/4th of 8
             ffn_dim        = 1024,    # 4× the embedding size
             n_layer        = 4,       # 1/7.5th of 30 (round to 4)
-            max_iters      = 5000,     # enough to see loss descend
-            eval_interval  = 1000,     # check validation every 100 iters
+            max_iters      = 500,     # enough to see loss descend
+            eval_interval  = 100,     # check validation every 100 iters
         )
-    else: cfg = dict(batch_size=4, block_size=2048, lr=1.2e-2, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
+    else: cfg = dict(batch_size=4, block_size=2048, lr=1.5e-3, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
 
     # allow CLI overrides
     if args.batch_size is not None: cfg["batch_size"] = args.batch_size
     if args.block_size is not None: cfg["block_size"] = args.block_size
     if args.lr is not None: cfg["lr"] = args.lr
     if args.max_iters is not None: cfg["max_iters"] = args.max_iters
+    phase1_iters = int(0.5 * cfg["max_iters"])
 
     print("----- Hyper-parameters -----")
     for k, v in cfg.items(): print(f"  {k:>13}: {v}")
@@ -129,7 +131,17 @@ if __name__ == "__main__":
     # -------------------- Model --------------------
 
     model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device, dtype=torch.bfloat16)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg["lr"], weight_decay=0.1)
+
+    # -------------------- Learning rate scheduler --------------------
+    ratio1 = 8e-4 / cfg["lr"]
+    sched1 = LinearLR(optimizer, start_factor=1.0, end_factor=ratio1, total_iters=phase1_iters)
+
+    # phase2: lr jumps to 5e-4 and linearly goes to 0 over the remaining steps
+    #   start_factor = (5e-4 / initial_lr) / ratio1  so that at the end of phase1 you are at 5e-4
+    ratio2_start = (5e-4 / cfg["lr"]) / ratio1
+    sched2 = LinearLR(optimizer, start_factor=ratio2_start, end_factor=0.0, total_iters=cfg["max_iters"] - phase1_iters)
+    scheduler = SequentialLR(optimizer, schedulers=[sched1, sched2], milestones=[phase1_iters])
 
     # diagnostics
     if args.debug:
@@ -157,5 +169,11 @@ if __name__ == "__main__":
                 if val_loss < best_loss:
                     best_loss = val_loss
                     save_checkpoint(model, optimizer, it, val_loss)
+
         training_step(model, xb, yb, optimizer)
+        scheduler.step()
+        # zero out WD halfway through
+        if it == phase1_iters: 
+            for pg in optimizer.param_groups: pg['weight_decay'] = 0.0
+
     model.generate(cfg["block_size"], tok, device)
