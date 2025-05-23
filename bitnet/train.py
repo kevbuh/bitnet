@@ -22,7 +22,9 @@ class CharDataset(Dataset):
         super().__init__()
         self.data = data
         self.block_size = block_size
-    def __len__(self) -> int: return len(self.data) - self.block_size
+    def __len__(self) -> int: 
+        assert len(self.data) > self.block_size, "Data length must be greater than block size"
+        return len(self.data) - self.block_size
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         chunk = self.data[idx : idx + self.block_size + 1]
         x = chunk[:-1]
@@ -41,8 +43,9 @@ def get_batch(loader_iter, loader):
     """Returns next (x, y) batch tensors, resetting iterator if exhausted."""
     try: xb, yb = next(loader_iter)
     except StopIteration:
-        loader_iter = iter(loader)
-        xb, yb = next(loader_iter)
+        new_iter = iter(loader)
+        xb, yb = next(new_iter)
+        return xb, yb, new_iter
     return xb, yb, loader_iter
 
 if __name__ == "__main__":
@@ -64,9 +67,19 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     # -------------------- Hyper-parameters --------------------
-    if args.debug:
-        if args.dataset == "wiki": cfg = dict(batch_size=16, block_size=192, lr=3e-4, n_embd=512, n_head=8, n_kv_head=4, ffn_dim=2048, n_layer=6, max_iters=None, eval_interval=200)
-        else: cfg = dict(batch_size=4, block_size=512, lr=3e-4, n_embd=1024, n_head=16, n_kv_head=4, ffn_dim=4096, n_layer=8, max_iters=1_000, eval_interval=100)
+    if args.debug: # because im gpu poor
+        cfg = dict(
+            batch_size     = 2,       # small so it fits in GPU memory
+            block_size     = 512,     # ¼ of the full context—but long enough to catch positional bugs
+            lr             = 3e-4,    # a standard debug learning‐rate
+            n_embd         = 256,     # 1/10th of 2560
+            n_head         = 8,       # 1/4th of 32; keeps head_dim = 256/8 = 32
+            n_kv_head      = 2,       # 1/4th of 8
+            ffn_dim        = 1024,    # 4× the embedding size
+            n_layer        = 4,       # 1/7.5th of 30 (round to 4)
+            max_iters      = 1_000,   # enough to see loss descend
+            eval_interval  = 100,     # check validation every 100 iters
+        )
     else:
         cfg = dict(batch_size=4, block_size=2048, lr=1.2e-2, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
 
@@ -108,7 +121,7 @@ if __name__ == "__main__":
     
     vocab_size = len(stoi)
     print(f"Vocabulary size: {vocab_size}")
-    print("----------------------------------------")
+    print("----------------------------")
 
     # -------------------- Model --------------------
     model = BitNet(vocab_size=vocab_size, d_model=cfg["n_embd"], block_size=cfg["block_size"], n_layer=cfg["n_layer"], n_head=cfg["n_head"], n_kv_head=cfg["n_kv_head"], ffn_dim=cfg["ffn_dim"]).to(device)
@@ -125,7 +138,7 @@ if __name__ == "__main__":
 
     # derive max_iters for wiki if not explicitly set
     if cfg["max_iters"] is None:
-        steps_per_epoch = math.ceil(len(train_loader))
+        steps_per_epoch = len(train_loader)
         cfg["max_iters"] = args.epochs * steps_per_epoch
         print(f"Computed max_iters = {cfg['max_iters']} (epochs={args.epochs}, steps/epoch={steps_per_epoch})")
 
@@ -138,7 +151,7 @@ if __name__ == "__main__":
         xb, yb, train_iter = get_batch(train_iter, train_loader)
         xb, yb = xb.to(device), yb.to(device)
 
-        if args.debug and (it % cfg["eval_interval"] == 0 or it == cfg["max_iters"] - 1):
+        if it % cfg["eval_interval"] == 0 or it == cfg["max_iters"] - 1:
             with torch.no_grad():
                 logits, loss = model(xb, yb)
                 val_loss = validate(model, val_loader, device)
