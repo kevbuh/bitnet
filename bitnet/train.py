@@ -7,25 +7,40 @@ $ python bitnet/train.py --dataset wiki --epochs 5 --batch_size 8
 import torch
 import argparse
 from tqdm import tqdm
-from typing import Tuple
 from pathlib import Path
 from datasets import load_dataset
+from typing import Tuple, Union, List
 from torch.utils.data import Dataset, DataLoader
 
 from model import BitNet
 from utils import print_model_params, training_step, calculate_model_size_in_gb, save_checkpoint, load_latest_checkpoint, validate, get_tokenizer
 
-class CharDataset(Dataset):
-    """Character-level language-model dataset that returns (x, y) tensors."""
-    def __init__(self, data: torch.Tensor, block_size: int):
+class TokenDataset(Dataset):
+    """
+    Token-level language-model dataset that returns (x, y) tensors.
+    
+    You can pass in either:
+      - a 1D torch.Tensor of token IDs, or
+      - a Python list of token IDs (it will be converted to a tensor).
+    """
+    def __init__(self, tokens: Union[torch.Tensor, List[int]], block_size: int):
         super().__init__()
-        self.data = data
+        if isinstance(tokens, list): tokens = torch.tensor(tokens, dtype=torch.long)
+        self.tokens = tokens
         self.block_size = block_size
-    def __len__(self) -> int: 
-        assert len(self.data) > self.block_size, "Data length must be greater than block size"
-        return len(self.data) - self.block_size
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        chunk = self.data[idx : idx + self.block_size + 1]
+        assert self.tokens.dim() == 1, "tokens must be a 1D sequence of IDs"
+        assert len(self.tokens) > block_size, "token sequence must be longer than block_size"
+
+    def __len__(self) -> int: return len(self.tokens) - self.block_size
+
+    def __getitem__(self, idx: int):
+        """
+        Returns:
+          x: LongTensor of shape (block_size,)
+          y: LongTensor of shape (block_size,)
+        where y[t] = x[t+1], i.e. next-token target.
+        """
+        chunk = self.tokens[idx : idx + self.block_size + 1]
         x = chunk[:-1]
         y = chunk[1:]
         return x, y
@@ -103,8 +118,8 @@ if __name__ == "__main__":
         train_data = torch.tensor(encode(train_text), dtype=torch.long)
         val_data   = torch.tensor(encode(val_text),   dtype=torch.long)
 
-    train_ds = CharDataset(train_data, cfg["block_size"])
-    val_ds = CharDataset(val_data, cfg["block_size"])
+    train_ds = TokenDataset(train_data, cfg["block_size"])
+    val_ds = TokenDataset(val_data, cfg["block_size"])
     train_loader = DataLoader(train_ds, batch_size=cfg["batch_size"], shuffle=True, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=cfg["batch_size"], shuffle=False, drop_last=True)
     
