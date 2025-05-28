@@ -1,3 +1,4 @@
+BitNet b1.58 2B4T (notes from papers)
 - Like llama, bitnet uses RMSNorm, SwiGLU, rotary embedding, and removes all biases
 - Replace all nn.Linear in attention and SwiGLU with BitLinear
 - Remove RMSNorm before attention and SwiGLU because BitLinear has built-in RMSNorm

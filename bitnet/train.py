@@ -89,7 +89,9 @@ if __name__ == "__main__":
             max_iters      = 500,     # enough to see loss descend
             eval_interval  = 100,     # check validation every 100 iters
         )
-    else: cfg = dict(batch_size=4, block_size=2048, lr=1.5e-3, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) # full 2.4B bitnet model
+    else: 
+        # full 2.4B bitnet model
+        cfg = dict(batch_size=4, block_size=2048, lr=1.5e-3, n_embd=2560, n_head=32, n_kv_head=8, ffn_dim=6912, n_layer=30, max_iters=10_000, eval_interval=100) 
 
     # allow CLI overrides
     if args.batch_size is not None: cfg["batch_size"] = args.batch_size

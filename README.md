@@ -420,16 +420,13 @@ model.norm.weight                               torch.Size([2560])         2560 
 ```
 
 # Todo
-- test inputs against inference weights
-- learning rate scheduling
-  - 1.5e-3 to 8e-4, then 5e-4 to 0
-- weight decay scheduling
-  - 0.1 for 50,000 steps, then 0
-- Official inference and training weights for 2.4B model
-  - Support for [other](https://huggingface.co/1bitLLM) LLaMa sizes to train
-- Binary kernels (triton?):
-  - ternary weight matrix–vector product into two binary matmuls plus a subtraction
-  - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
+- Test inputs against inference weights
+- Test official training weights for 2.4B model
+  - Support for [other](https://huggingface.co/1bitLLM) LLaMa sizes too
+- Make fast
+  - Binary kernels (triton?):
+    - ternary weight matrix–vector product into two binary matmuls plus a subtraction
+    - Custom [XNOR–popcount routines](https://arxiv.org/pdf/1905.10759) replace expensive MAC units, enabling 10× throughput improvements in CPU binary matmul kernels
 - Test performance against huggingface and Microsoft bitnet.cpp
 - Set up custom installation script thats nice and says jax or torch and which models to run 
 - Make new hardware for it (fpga)
