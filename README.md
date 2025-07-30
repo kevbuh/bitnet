@@ -10,9 +10,7 @@ tldr; **No more floats.** Just weights in **[1, 0, -1]**.
 # Setup
 
 ```bash
-chmod +x setup.sh
-./setup.sh
-source venv/bin/activate
+source setup.sh
 ```
 
 # Papers

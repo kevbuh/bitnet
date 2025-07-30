@@ -1,6 +1,3 @@
-#!/usr/bin/env bash
-set -e
-
 python3 -m venv venv
 source venv/bin/activate
 
@@ -14,6 +11,3 @@ else
   echo "Downloading weights..."
   git lfs install
   git clone https://huggingface.co/microsoft/bitnet-b1.58-2B-4T-bf16
-
-echo "✅ Virtual environment created and dependencies installed."
-echo "To activate it later, run: source venv/bin/activate"
